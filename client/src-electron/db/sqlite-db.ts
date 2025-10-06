@@ -1,9 +1,9 @@
 /*
  * Authors: Kevin Sirantoine, Rachel Patella
  * Created: 2025-09-10
- * Updated: 2025-09-25
+ * Updated: 2025-10-06
  *
- * This file Initializes the example SQLite database, prepares queries, and exports functions for interacting with the
+ * This file Initializes the SQLite database, prepares queries, and exports functions for interacting with the
  * SQLite database.
  *
  * This file is a part of OpenOrganizer.
@@ -15,19 +15,36 @@ import { app } from 'electron';
 import path from 'path';
 import * as sql from "./sql";
 
-// test.db located in ..\AppData\Roaming\Electron
-const dbPath = path.join(app.getPath('userData'), 'test.db');
+// local.db located in ..\AppData\Roaming\Electron
+const dbPath = path.join(app.getPath('userData'), 'local.db');
 const db = new Database(dbPath);
 
+// Create tables if not exists
+db.exec(sql.createNotesTable);
+db.exec(sql.createRemindersTable);
+db.exec(sql.createDailyTable);
+db.exec(sql.createWeeklyTable);
+db.exec(sql.createMonthlyTable);
+db.exec(sql.createYearlyTable);
+db.exec(sql.createGeneratedTable);
+db.exec(sql.createExtensionsTable);
+db.exec(sql.createOverridesTable);
+db.exec(sql.createFoldersTable);
+db.exec(sql.createDeletedTable);
+
+// Example db
+// test.db located in ..\AppData\Roaming\Electron
+const exDBPath = path.join(app.getPath('userData'), 'test.db');
+const exDB = new Database(exDBPath);
 
 // Create example table if not exists
-db.exec(sql.createExTable);
+exDB.exec(sql.createExTable);
 
 // prepare all sql queries once
-const createExEntry = db.prepare(sql.createExEntry);
-const readExEntry = db.prepare(sql.readExEntry);
-const updateExEntry = db.prepare(sql.updateExEntry);
-const deleteExEntry = db.prepare(sql.deleteExEntry);
+const createExEntry = exDB.prepare(sql.createExEntry);
+const readExEntry = exDB.prepare(sql.readExEntry);
+const updateExEntry = exDB.prepare(sql.updateExEntry);
+const deleteExEntry = exDB.prepare(sql.deleteExEntry);
 
 // Create entry in example table
 export function create(key: string, value: string) {

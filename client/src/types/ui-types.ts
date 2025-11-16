@@ -2,7 +2,7 @@
 /*
  * Authors: Rachel Patella
  * Created: 2025-10-21
- * Updated: 2025-11-12
+ * Updated: 2025-11-16
  *
  * This file contains interfaces that extend the shared-types with UI-specific fields.
  *
@@ -47,7 +47,9 @@ export type UIReminder = Reminder & {
   // Extension is always present (may be empty) to avoid undefined checks in UI. Still optional in backend
   extension: Record<string, string | number | null>;  // Essentially extension is a dictionary-like object with keys (ex. field names) and values  
   // useful for adding on custom event type fields/extensions that we may not know the types to yet
-  // Need to parse and store this text data in the separate extensions table in the backend
+  // Reminder recurrence fields to fill out UI form
+  recurrence?: recurrenceReminder | null;
+  isRecurring: boolean;
   isSaved: boolean;
   isEditing: boolean; 
   isSelected: boolean;
@@ -55,6 +57,45 @@ export type UIReminder = Reminder & {
   temporaryEventEndDateEnabled: boolean;
   // UI-only date field - calendar date selected for the reminder
   date: string;
+};
+
+// Recurrence reminder (holds all recurrence reminder types)
+export type recurrenceReminder = {
+  type: string;
+  daily?: dailyReminder;
+  weekly?: weeklyReminder;
+  monthly?: monthlyReminder;
+  yearly?: yearlyReminder;
+};
+
+export type dailyReminder = {
+  timeOfDayMin: string;
+  eventDurationMin: number;
+  notifOffsetTimeMin: number | null;
+  everyNDays: number;
+};
+
+export type weeklyReminder = {
+  timeOfDayMin: number;
+  eventDurationMin: number;
+  notifOffsetTimeMin: number | null;
+  everyNWeeks: number;
+  daysOfWeek: string;
+};
+
+export type monthlyReminder = {
+  timeOfDayMin: string;
+  eventDurationMin: number;
+  notifOffsetTimeMin: number | null;
+  lastDayOfMonth: boolean;
+  daysOfMonth: string;
+};
+
+export type yearlyReminder = {
+  timeOfDayMin: string;
+  eventDurationMin: number;
+  notifOffsetTimeMin: number | null;
+  dayOfYear: number;
 };
 
 // Shared-types folder has folderID, lastModified, parentFolderID, colorCode, folderName

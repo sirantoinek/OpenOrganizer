@@ -1,7 +1,7 @@
 <!--
  * Authors: Rachel Patella, Maria Pasaylo, Michael Jagiello
  * Created: 2025-09-22
- * Updated: 2025-11-14
+ * Updated: 2025-11-16
  *
  * This file is the main home page that includes the calendar view, notes/reminders list, 
  * and a file explorer as a 3 column grid layout.
@@ -231,8 +231,20 @@
                       Last modified: {{(item.temporaryLastModified) }}
                   </div>
                 <q-checkbox
+                  v-if="!item.isRecurring"
                   v-model="item.temporaryEventEndDateEnabled"
                   label="Multi‑day"
+                  dense
+                  hide-bottom-space
+                  :color="getEventTypeColor(eventTypes, item.eventType)" 
+                  style="margin-bottom:10px"
+                />
+                <br>
+                <q-checkbox
+                   v-if="!item.temporaryEventEndDateEnabled"
+                  v-model="item.isRecurring"
+                  @update:model-value="val => onToggleRecurrenceType(item, val)"
+                  label="Recurring"
                   dense
                   hide-bottom-space
                   :color="getEventTypeColor(eventTypes, item.eventType)" 
@@ -268,8 +280,51 @@
                 outlined
                 style="background-color: #f2f2f2; margin-bottom: 10px"
               />
+              <!-- everyNDays (daily) must not be less than 1 and timeOfDayMin must be between 0 and 1439-->
+              <div v-if="item.recurrence">
+                   <q-select
+                    v-model="item.recurrence.type"
+                    :options="recurrenceOptions"
+                    label="Recurrence Type"
+                    emit-value
+                    map-options
+                    dense
+                    outlined
+                    style="background-color: #f2f2f2; margin-bottom: 10px"
+                  />
+                  <div v-if="item.recurrence.type === 'daily' && item.recurrence.daily" style="margin-bottom:8px;">
+                  <q-input
+                  v-model="item.recurrence.daily.timeOfDayMin"
+                  label="Event time (in minutes into day)"
+                  :min="0"
+                  :max="1439"
+                  type="number"
+                  outlined
+                  dense
+                  style="background-color: #f2f2f2; margin-bottom: 10px"
+                />
+                <q-input
+                  v-model="item.recurrence.daily.eventDurationMin"
+                  label="Event duration (in minutes)"
+                  :min="0"
+                  type="number"
+                  outlined
+                  dense
+                  style="background-color: #f2f2f2; margin-bottom: 10px"
+                />
+                <q-input
+                  v-model="item.recurrence.daily.everyNDays"
+                  label="Frequency (every # days)"
+                  type="number"
+                  :min="1"
+                  outlined
+                  dense
+                  style="background-color: #f2f2f2; margin-bottom: 10px"
+                />
+                </div>
+                </div>
               <!-- Hide generic reminders temporary event start and end time for event types -->
-              <template v-if="item.eventType !== 1 && item.eventType !== 2">
+              <template v-if="item.eventType !== 1 && item.eventType !== 2 && !item.isRecurring">
               <q-input
                   v-model="item.temporaryEventStartTime"
                   :label="getEventStartLabel(item.eventType)"
@@ -746,6 +801,15 @@ const notificationOptions = [
   { label: '1 hour before', value: 60 },
   { label: '2 hours before', value: 120 }
   ];
+
+// List of recurrence type options 
+const recurrenceOptions = [
+  { label: 'Daily', value: 'daily' },
+  { label: 'Weekly', value: 'weekly' },
+  { label: 'Monthly', value: 'monthly' },
+  { label: 'Yearly', value: 'yearly' }
+  ];
+
 // Array of notes
 const notes = ref<UINote[]>([])
 
@@ -977,6 +1041,26 @@ async function onToggleCloudSync() {
    // Incase of error, reset sync status
   } finally {
     isSyncing.value = false;
+  }
+}
+
+// Since a recurrence is an optional property, function to safely toggle checkbox
+function onToggleRecurrenceType(item: UIReminder, enabled: boolean) {
+  // isRecurring property uses checkbox value from user
+  item.isRecurring = enabled;
+  // If checkbox is enabled, initialize a default recurrence
+  if (enabled) {
+    item.recurrence = { 
+    type: 'daily', 
+    daily: {
+    timeOfDayMin: '',
+    eventDurationMin: 0,
+    notifOffsetTimeMin: null,
+    everyNDays: 1
+  }};
+  } else {
+    // If disabled, clear recurrence type
+    item.recurrence = null;
   }
 }
 
@@ -1212,7 +1296,8 @@ function addReminder() {
     isEditing: false,
     isSelected: false,
     expanded: true,
-    temporaryEventEndDateEnabled: false
+    temporaryEventEndDateEnabled: false,
+    isRecurring: false
   } as UIReminder;
 
   // Add draft reminder to reminders array for UI rendering
@@ -1527,7 +1612,9 @@ function mapDBToUIReminder(row: Reminder, upsert: boolean): UIReminder {
     isSaved: true,
     isEditing: false,
     isSelected: false,
-    expanded: true,
+    // Set this true elsewhere later
+    isRecurring: false,
+    expanded: true
   } as UIReminder;
 
   // If true, update (if existing) or insert (if not) UI reminder into global reminders array

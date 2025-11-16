@@ -1,7 +1,7 @@
 /*
  * Authors: Michael Jagiello
  * Created: 2025-11-08
- * Updated: 2025-11-09
+ * Updated: 2025-11-16
  *
  * This file defines all main functionality for creating, maintaining, and executing notifcations based on reminders and generated reminders.
  *
@@ -14,7 +14,7 @@ import * as cron from 'node-cron'
 import { Notification } from "electron";
 import { getDayOfYear, type Timestamp } from '@quasar/quasar-ui-qcalendar';
 import { convertTimeAndDateToTimestamp } from "src/frontend-utils/time";
-import type { Reminder } from '../types/shared-types';
+import type { GeneratedReminder, Override, Reminder } from '../types/shared-types';
 
 interface Notif {
   itemID: bigint,
@@ -33,10 +33,25 @@ export function InitNotifications() {
   cron.schedule("* * * * *", () => { CheckNotifications() });
 }
 
+function CheckNotifications() {
+  const now = GetNowTime();
+  for (const [key, notif] of notifications) {
+    if (notif.time == now) {
+      Notify(notif);
+    }
+  }
+}
+
+function Notify(notif: Notif) {
+  new Notification({ title: notif.title, body: notif.body }).show();
+}
+
+// set / delete
+
 // adds or updates reminder for notification details
-// only adds if hasNotif == true, else deletes
+// only adds if hasNotif == true and is InFuture, else deletes
 export function SetNotifReminder(reminder: Reminder) {
-  if (!reminder.hasNotif) {
+  if (!reminder.hasNotif && !InNearFuture(reminder)) {
     DeleteNotif(reminder.itemID);
     return false;
   }
@@ -51,28 +66,36 @@ export function SetNotifReminder(reminder: Reminder) {
 }
 
 // adds or updates generated reminder for notification details
-// only adds if hasNotif == true, else deletes
-//export function SetNotifGenerated() {}
+// only adds if hasNotif == true and is InFuture, else deletes
+export function SetNotifGenerated(reminder: GeneratedReminder) {
+  if (!reminder.hasNotif && !InNearFuture(reminder)) {
+    DeleteNotifGenerated(reminder);
+    return false;
+  }
+  const notif: Notif = {
+    itemID: reminder.itemID,
+    origEventStartTime: TimeToBigint(reminder.origEventStartYear, reminder.origEventStartDay, reminder.origEventStartMin),
+    time: TimeToBigint(reminder.notifYear, reminder.notifDay, reminder.notifMin),
+    title: reminder.title,
+    body: ""
+  };
+  notifications.set(CombineBigints64(notif.itemID, notif.origEventStartTime!), notif);
+  return true;
+}
+
+// these are asymmetrical due to how handlers vary between reminder and generated methods - this reduces querying
 
 // deletes notification
-// origEventStartTime is required for generated reminders
-export function DeleteNotif(itemID: bigint, origEventStartTime?: bigint) {
-  if (origEventStartTime == undefined) origEventStartTime = itemID;
-  return notifications.delete(CombineBigints64(itemID, origEventStartTime));
+export function DeleteNotif(itemID: bigint) {
+  return notifications.delete(CombineBigints64(itemID, itemID));
 }
 
-function CheckNotifications() {
-  const now = GetNowTime();
-  for (const [key, notif] of notifications) {
-    if (notif.time == now) {
-      Notify(notif);
-    }
-  }
+// deletes notification
+export function DeleteNotifGenerated(reminder: GeneratedReminder) {
+  return notifications.delete(CombineBigints64(reminder.itemID, TimeToBigint(reminder.origEventStartYear, reminder.origEventStartDay, reminder.origEventStartMin)));
 }
 
-function Notify(notif: Notif) {
-  new Notification({ title: notif.title, body: notif.body }).show();
-}
+// helpers
 
 // gets current time, formatted as a bigint with 4 bytes for year, 2 bytes for day of year, and 2 bytes for minute
 function GetNowTime() {
@@ -109,4 +132,9 @@ function TimeToBigint(year: number, day: number, minute: number) {
 // concatenates two 64-bit bigints
 function CombineBigints64(a: bigint, b: bigint) {
   return (a << 64n) | b;
+}
+
+function InNearFuture(reminder: Reminder | GeneratedReminder) {
+  const nowYear = new Date().getFullYear();
+  return reminder.notifYear == nowYear || reminder.notifYear == nowYear + 1;
 }

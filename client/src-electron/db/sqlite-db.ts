@@ -1,7 +1,7 @@
 /*
  * Authors: Kevin Sirantoine, Rachel Patella
  * Created: 2025-09-10
- * Updated: 2025-11-13
+ * Updated: 2025-11-16
  *
  * This file initializes the SQLite database, prepares queries, and exports functions for interacting with the
  * SQLite database.
@@ -38,7 +38,9 @@ const db = new Database(dbPath);
 createTables();
 
 // prepare all sql queries once
+
 // create
+
 const createNoteStmt = db.prepare(sql.createNoteStmt);
 const createReminderStmt = db.prepare(sql.createReminderStmt);
 const createDailyReminderStmt = db.prepare(sql.createDailyReminderStmt);
@@ -52,6 +54,7 @@ const createFolderStmt = db.prepare(sql.createFolderStmt);
 const createDeletedStmt = db.prepare(sql.createDeletedStmt);
 
 // read
+
 const readNoteStmt = db.prepare(sql.readNoteStmt);
 const readReminderStmt = db.prepare(sql.readReminderStmt);
 const readDailyReminderStmt = db.prepare(sql.readDailyReminderStmt);
@@ -62,6 +65,7 @@ const readGeneratedReminderStmt = db.prepare(sql.readGeneratedReminderStmt);
 const readOverridesStmt = db.prepare(sql.readOverridesStmt);
 const readExtensionsStmt = db.prepare(sql.readExtensionsStmt);
 const readFolderStmt = db.prepare(sql.readFolderStmt);
+const readGeneratedsStmt = db.prepare(sql.readGeneratedsStmt);
 
 const readNotesInRangeStmt = db.prepare(sql.readNotesInRangeStmt);
 const readRemindersInRangeStmt = db.prepare(sql.readRemindersInRangeStmt);
@@ -106,6 +110,7 @@ const readGeneratedReminderIDInYearStmt = db.prepare(sql.readGeneratedReminderID
 const readOverrideIDStmt = db.prepare(sql.readOverrideIDStmt);
 
 // update
+
 const updateNoteStmt = db.prepare(sql.updateNoteStmt);
 const updateReminderStmt = db.prepare(sql.updateReminderStmt);
 const updateDailyReminderStmt = db.prepare(sql.updateDailyReminderStmt);
@@ -115,6 +120,7 @@ const updateYearlyReminderStmt = db.prepare(sql.updateYearlyReminderStmt);
 const updateFolderStmt = db.prepare(sql.updateFolderStmt);
 
 //delete
+
 const deleteNoteStmt = db.prepare(sql.deleteNoteStmt);
 const deleteReminderStmt = db.prepare(sql.deleteReminderStmt);
 const deleteDailyReminderStmt = db.prepare(sql.deleteDailyReminderStmt);
@@ -129,9 +135,10 @@ const deleteGeneratedRemindersOutsideYearRangeStmt = db.prepare(sql.deleteGenera
 const deleteGeneratedRemindersByIdStmt = db.prepare(sql.deleteGeneratedRemindersByIdStmt);
 const deleteOverridesByLinkedIdStmt = db.prepare(sql.deleteOverridesByLinkedIdStmt);
 
-
 // Table CRUD functions:
+
 // create
+
 export function createNote(newNote: Note) {
   createNoteStmt.run(newNote.itemID, newNote.lastModified, newNote.folderID, newNote.isExtended, newNote.title, newNote.text);
   if (newNote.extensions !== undefined) for (const ext of newNote.extensions) createExtension(ext);
@@ -268,8 +275,8 @@ export function createDeleted(newDeleted: Deleted) {
   createDeletedStmt.run(newDeleted.itemID, newDeleted.lastModified, newDeleted.itemTable);
 }
 
-
 // read
+
 export function readNote(itemID: bigint) {
   const note = readNoteStmt.get(itemID) as Note;
   if (note === undefined) return undefined;
@@ -357,7 +364,15 @@ export function readFolder(folderID: bigint) {
   return folder;
 }
 
+export function readGeneratedReminders(itemID: bigint) {
+  const reminders = readGeneratedsStmt.get(itemID) as GeneratedReminder[];
+  if (reminders === undefined) return undefined;
+  castGeneratedRemindersBigInts(reminders);
+  return reminders;
+}
+
 // read in range
+
 export function readNotesInRange(windowStartMs: bigint, windowEndMs: bigint) {
   const notes = readNotesInRangeStmt.all({ windowStartMs: windowStartMs, windowEndMs: windowEndMs }) as Note[];
   if (notes === undefined) return undefined;
@@ -486,6 +501,7 @@ export function readGeneratedRemindersInRange(rangeWindow: RangeWindow) {
 }
 
 // read all
+
 export function readAllFolders() {
   const folders = readAllFoldersStmt.all() as Folder[];
   if (folders === undefined) return undefined;
@@ -494,6 +510,7 @@ export function readAllFolders() {
 }
 
 // get IDs based on folderID
+
 export function readNotesInFolder(folderID: bigint) {
   const itemIDs = readNotesInFolderStmt.all(folderID) as { itemID: bigint }[];
   return itemIDs.map(itemID => BigInt(itemID.itemID));
@@ -530,6 +547,7 @@ export function readFoldersInFolder(parentFolderID: bigint) {
 }
 
 // read all modified after a given timestamp (for use in sync-up)
+
 export function readNotesAfter(lastUpdated: bigint) {
   const notes = readNotesAfterStmt.all(lastUpdated) as Note[];
   if (notes === undefined) return undefined;
@@ -601,6 +619,7 @@ export function readDeletesAfter(lastUpdated: bigint) {
 }
 
 // read lastModified based on itemID (used in storing items retrieved in sync-down)
+
 export function readNoteLm(itemID: bigint) {
   const lastModified = readNoteLmStmt.get(itemID) as { lastModified: bigint };
   if (lastModified === undefined) return undefined;
@@ -674,6 +693,7 @@ export function readOverrideID(linkedItemID: bigint, origEventStartYear: number,
 }
 
 // update
+
 export function updateNote(modNote: Note) {
   updateNoteStmt.run(modNote.lastModified, modNote.folderID, modNote.isExtended, modNote.title, modNote.text, modNote.itemID); // itemID last
   if (modNote.extensions !== undefined) for (const ext of modNote.extensions) createExtension(ext);
@@ -778,8 +798,8 @@ export function updateFolder(modFolder: Folder) {
   updateFolderStmt.run(modFolder.lastModified, modFolder.parentFolderID, modFolder.colorCode, modFolder.folderName, modFolder.folderID); // folderID last
 }
 
-
 // delete
+
 export function deleteNote(itemID: bigint) {
   return (deleteNoteStmt.run(itemID).changes != 0);
 }
@@ -834,8 +854,8 @@ export function clearAllTables() {
   createTables();
 }
 
-
 // helpers
+
 function createTables() {
   db.exec(sql.createNotesTable);
   db.exec(sql.createRemindersTable);
@@ -920,8 +940,6 @@ function castDeleteBigInts(deleted: Deleted) {
 function castDeletesBigInts(deletes: Deleted[]) {
   for (const deleted of deletes) castDeleteBigInts(deleted);
 }
-
-
 
 
 // Example db

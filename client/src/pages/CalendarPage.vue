@@ -2314,6 +2314,40 @@ async function deleteReminder(reminder: UIReminder) {
   //reminders.value = reminders.value.filter(reminder => !reminder.isSelected);
 }
 
+// Function to delete selected recurring reminders
+async function deleteRecurringReminderSeries(reminder: UIReminder) {
+  try {
+    // Validate that the reminder is recurring
+    if (!reminder.recurrence || !reminder.isRecurring) {
+      console.error('Reminder is not recurring:', reminder.itemID);
+      return;
+    }
+
+    // Delete recurring series using its types table number
+    // Deleting a series automatically deletes all its generated reminders 
+    if (reminder.recurrence.type === 'daily') {
+     await deleteItem(reminder.itemID, 21);
+   } else if (reminder.recurrence.type === 'weekly') {
+     await deleteItem(reminder.itemID, 22);
+   } else if (reminder.recurrence.type === 'monthly') {
+     await deleteItem(reminder.itemID, 23);
+   } else if (reminder.recurrence.type === 'yearly') {
+     await deleteItem(reminder.itemID, 24);
+   } else {
+    // Not a valid recurrence type
+     return;
+   }
+    // Update reminders array to filter out deleted reminder
+    // Array only contains reminders where the itemID does not match the deleted reminder's itemID
+    reminders.value = reminders.value.filter(r => r.itemID !== reminder.itemID);
+   // Successful deletion, refresh file explorer
+   folders.value = mapDBToUIFolder(await readAllFolders());
+  } catch (error) {
+    console.error('Error deleting recurring reminder series from DB:', error);
+  }
+} 
+
+
 // Function to delete selected individual checkbox notes
 async function deleteNote(note: UINote) {
   try {
@@ -2423,8 +2457,13 @@ async function deleteArrayItem() {
   if (tab.value === 'reminders') {
     // Delete all selected reminders by calling deleteReminder for each selected item
     const selectedReminders = reminders.value.filter(reminder => reminder.isSelected);
+    // Call appropriate delete function dependent on if reminder is recurring or not
     for (const reminder of selectedReminders) {
-      await deleteReminder(reminder);
+      if (reminder.isRecurring) {
+        await deleteRecurringReminderSeries(reminder);
+      } else {
+        await deleteReminder(reminder);
+      }
     }
   } else if (tab.value === 'notes') {
     // Delete all selected notes by calling deleteNote for each selected item
@@ -2502,13 +2541,18 @@ const filteredReminders = computed(() => {
   // Search functionality example: https://stackoverflow.com/questions/74670957/how-to-display-search-results-using-react-typescript
   const query = (searchQuery.value ?? '').trim().toLowerCase();
 
+  // Filter out recurring reminders from reminder list for middle list display
+  // Only when not saved, must allow drafts to create the recurrence
+  //const noRecurringReminders = reminders.value.filter(reminder => !reminder.isRecurring || !reminder.isSaved);
+  const noRecurringReminders = reminders.value;
+
   if (!searchQuery.value) {
     // If no search query, default show reminders for selected calendar date
-    return reminders.value.filter(reminder => reminder.date === selectedDate.value);
+    return noRecurringReminders.filter(reminder => reminder.date === selectedDate.value);
   }
 
   // Otherwise, filter reminders based on the search query (title)
-  return reminders.value.filter(reminder => {
+  return noRecurringReminders.filter(reminder => {
     // Check for reminders entries where the title is in the search query
     const matchesQuery = String(reminder.temporaryTitle ?? '').toLowerCase().includes(query) || String(reminder.title ?? '').toLowerCase().includes(query);
     // Return true if both date and query match

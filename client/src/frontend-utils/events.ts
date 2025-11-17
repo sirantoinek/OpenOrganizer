@@ -70,6 +70,10 @@ export function buildCalendarEvents(reminders: UIReminder[], eventTypes: EventTy
 
   // Iterate through viewable calendar month reminders
   for (const reminder of reminders) {
+    // Do not push calendar event for a recurring reminder
+      if (reminder.isRecurring) {
+        continue;
+      }
        // Build a single-day calendar event for each saved reminder in the viewable month
        if (reminder.isSaved) {
         events.push({

@@ -73,6 +73,7 @@ export type dailyReminder = {
   eventDurationMin: number;
   notifOffsetTimeMin: number | null;
   everyNDays: number;
+  seriesEndDate: string;
 };
 
 export type weeklyReminder = {
@@ -81,6 +82,7 @@ export type weeklyReminder = {
   notifOffsetTimeMin: number | null;
   everyNWeeks: number;
   daysOfWeek: string;
+  seriesEndDate: string;
 };
 
 export type monthlyReminder = {
@@ -89,6 +91,7 @@ export type monthlyReminder = {
   notifOffsetTimeMin: number | null;
   lastDayOfMonth: boolean;
   daysOfMonth: string;
+  seriesEndDate: string;
 };
 
 export type yearlyReminder = {
@@ -96,6 +99,7 @@ export type yearlyReminder = {
   eventDurationMin: number;
   notifOffsetTimeMin: number | null;
   dayOfYear: number;
+  seriesEndDate: string;
 };
 
 // Shared-types folder has folderID, lastModified, parentFolderID, colorCode, folderName

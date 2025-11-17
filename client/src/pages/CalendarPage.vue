@@ -226,10 +226,26 @@
                     </div>
               </template>
               <q-card-section>
-                    <div style="padding-bottom:10px">
-                      Event date: {{ eventDatetoLocaleString(item.date) }}<br>
-                      Last modified: {{(item.temporaryLastModified) }}
-                  </div>
+                     <div style="padding-bottom:10px">
+                      <!-- Single-day non-recurring reminder -->
+                      <template v-if="!item.isRecurring && !item.temporaryEventEndDateEnabled">
+                        Event date: {{ eventDatetoLocaleString(item.date) }}<br>
+                      </template>
+                      
+                      <!-- Multi-day non-recurring reminder -->
+                      <template v-else-if="!item.isRecurring && item.temporaryEventEndDateEnabled">
+                        Event start: {{ eventDatetoLocaleString(item.date) }}<br>
+                        Event end: {{ eventDatetoLocaleString(item.temporaryEventEndDay) }}<br>
+                      </template>
+                      
+                      <!-- Recurring reminder -->
+                      <template v-else-if="item.isRecurring && item.recurrence?.daily">
+                        Series start: {{ eventDatetoLocaleString(item.date) }}<br>
+                        Series end: {{eventDatetoLocaleString(item.recurrence.daily.seriesEndDate)}}<br>
+                      </template>
+                      
+                      Last modified: {{ item.temporaryLastModified }}
+                    </div>
                 <q-checkbox
                   v-if="!item.isRecurring"
                   v-model="item.temporaryEventEndDateEnabled"
@@ -295,7 +311,7 @@
                   <div v-if="item.recurrence.type === 'daily' && item.recurrence.daily" style="margin-bottom:8px;">
                   <q-input
                   v-model="item.recurrence.daily.timeOfDayMin"
-                  label="Event time (in minutes into day)"
+                  label="Event Time (in minutes into day)"
                   :min="0"
                   :max="1439"
                   type="number"
@@ -305,7 +321,7 @@
                 />
                 <q-input
                   v-model="item.recurrence.daily.eventDurationMin"
-                  label="Event duration (in minutes)"
+                  label="Event Duration (in minutes)"
                   :min="0"
                   type="number"
                   outlined
@@ -317,6 +333,17 @@
                   label="Frequency (every # days)"
                   type="number"
                   :min="1"
+                  outlined
+                  dense
+                  style="background-color: #f2f2f2; margin-bottom: 10px"
+                />
+                <!--- Limiting series end date to 100 years from now at max -->
+                <q-input
+                  v-model="item.recurrence.daily.seriesEndDate"
+                  label="Series End Date"
+                  type="date"
+                  :min="item.date"
+                  :max="endDateRangeRecurring(item.date)"
                   outlined
                   dense
                   style="background-color: #f2f2f2; margin-bottom: 10px"
@@ -742,7 +769,10 @@ import { convertTimeAndDateToTimestamp, convertNotificationTimestamp, minutesToH
 import { ref, computed, watch, onMounted } from 'vue';
 import type { UINote, UIReminder, UIFolder } from '../types/ui-types';
 import type { Reminder, Note, Folder, Extension } from '../../src-electron/types/shared-types';
-import {createNote, createReminder, createFolder, createRootFolder, readNote, readReminder, readAllFolders, updateNote, updateReminder, updateFolder, deleteItem, deleteFolder, readRemindersInRange, readNotesInRange} from '../utils/local-db';
+import {createNote, createReminder, createDailyReminder, createWeeklyReminder, createMonthlyReminder, createYearlyReminder, createOrUpdateOverride, createFolder, createRootFolder,
+  readNote, readNotesInRange, readReminder, readRemindersInRange, readAllFolders, 
+  updateNote, updateReminder, updateDailyReminder, updateWeeklyReminder, updateMonthlyReminder, updateYearlyReminder, updateFolder, 
+  deleteItem, deleteFolder} from '../utils/local-db';
 import { FieldsToFlight, FieldsToHotel, FlightToExtensions, HotelToExtensions, ExtensionsToFlight, ExtensionsToHotel } from '../utils/eventtypes';
 import { useQuasar } from 'quasar';
 import { useRouter } from 'vue-router';
@@ -765,6 +795,7 @@ function endDateRange(startDate: string): { min: string; max: string } {
   if (!dateString) {
     dateString = normalizeDatePickerToCalendar(String(selectedDate.value ?? '')) || '';
   }
+
   if (dateString) {
     const [yearString, monthString, dayString] = dateString.split('-');
     const year = Number(yearString);
@@ -775,8 +806,7 @@ function endDateRange(startDate: string): { min: string; max: string } {
     sDate.setHours(0, 0, 0, 0);
 
     const endDate = new Date(sDate);
-    // Takes the start date (0 time) and adds 365 
-    // days to it for max end date
+    // Takes the start date (0 time) and adds 365 days to it for max end date
     endDate.setDate(endDate.getDate() + 365);
 
     const startString = `${sDate.getFullYear()}-${String(sDate.getMonth() + 1).padStart(2, '0')}-${String(sDate.getDate()).padStart(2, '0')}`;
@@ -788,6 +818,32 @@ function endDateRange(startDate: string): { min: string; max: string } {
 
   // If input is invalid or empty, return empty strings to satisfy the declared return type
   return { min: '', max: '' };
+}
+
+// Helper function to determine days user can pick for series end day (from start day to 100 years later)
+function endDateRangeRecurring(startDate: string) {
+  let dateString = normalizeDatePickerToCalendar(startDate ?? '') || '';
+  // If provided startDate is empty/invalid, fallback to currently selected calendar date
+  if (!dateString) {
+    dateString = normalizeDatePickerToCalendar(String(selectedDate.value ?? '')) || '';
+  }
+
+  if (dateString) {
+    const [yearString, monthString, dayString] = dateString.split('-');
+    const year = Number(yearString);
+    const month = Number(monthString);
+    const day = Number(dayString);
+    // Create a new start date object from inputted start date with 0 hours, minutes, seconds to compare full day
+    const sDate = new Date(year, month - 1, day);
+    sDate.setHours(0, 0, 0, 0);
+
+    const endDate = new Date(sDate);
+    // Takes the start date (0 time) and add 100 years for end date
+    endDate.setFullYear(endDate.getFullYear() + 100);
+    const endString = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`;
+
+    return endString;
+  }
 }
 
 // List of notification options for when to be notified for reminder
@@ -1055,8 +1111,9 @@ function onToggleRecurrenceType(item: UIReminder, enabled: boolean) {
     daily: {
     timeOfDayMin: '',
     eventDurationMin: 0,
-    notifOffsetTimeMin: null,
-    everyNDays: 1
+    notifOffsetTimeMin: item.temporaryNotificationTime ?? null,
+    everyNDays: 1,
+    seriesEndDate: '' 
   }};
   } else {
     // If disabled, clear recurrence type
@@ -1879,6 +1936,157 @@ async function saveNote(note: UINote){
   }
 }
 
+// Function to limit event duration by recurrence type to prevent overlaps
+// Ex. Daily reminders cant be more than 1 day, weekly more than a week, etc.
+function getRecurrenceEventDuration(recurrenceType: string): number {
+  switch (recurrenceType) {
+    case 'daily': {
+      // Number of minutes in a day (24 hrs a day * 60 min an hr = 1140 min max)
+      // event duration cannot exceed more than 1 day (24 hours) for a daily recurring reminder
+      return 1140;
+    }
+
+    case 'weekly': {
+      // Number of minutes in a week (7 days * 24 hrs a day * 60 min an hr = 10080 min max)
+      // event duration cannot exceed more than 1 week/7 days for a weekly recurring reminder
+      return 10080;
+    }
+
+    case 'monthly': {
+      // Number of minutes in a month (28 days * 24 hrs a day * 60 min an hr = 40320 min max)
+      // event duration cannot exceed more than 1 month/28 days for a monthly recurring reminder
+      // Using 28 days for safety because using 31 days can be dangerous for a month with less (it will overlap)
+      return 40320;
+    }
+
+    case 'yearly': {
+      // Number of minutes in a year (365 days * 24 hrs a day * 60 min an hr = 525600 min max)
+      // event duration cannot exceed more than 1 year/365 days for yearly recurring reminder
+      // Using 365 days (not 366 for leap) for safety
+      return 525600;
+    }
+
+    // If nothing else matches, use daily (within a day)
+    default: {
+      return 1440;
+    }
+  }
+}
+
+// Function to validate and save recurring reminder when save button is clicked
+// Returns true if successful (passed validation and saved DB entry), false if not
+async function saveRecurringReminder(reminder: UIReminder) {
+  // Not a recurring reminder
+  if (!reminder.recurrence || !reminder.isRecurring) {
+    return false;
+  }
+
+  // Recurrence exists, validate daily fields
+  if (reminder.recurrence.type === 'daily') {
+    if (!reminder.recurrence.daily) {
+      reminder.timeMessageError = 'Daily recurrence settings are missing.';
+      return false;
+    }
+
+   const everyNDays = Number(reminder.recurrence.daily.everyNDays);
+   const timeOfDayMin = Number(reminder.recurrence.daily.timeOfDayMin);
+   const eventDurationMin = Number(reminder.recurrence.daily.eventDurationMin);
+    
+     // everyNDays must be not be less than 1
+    if (!Number.isInteger(everyNDays) || everyNDays < 1) {
+      reminder.timeMessageError = 'Recurrence interval must be greater than 1.';
+      return false;
+    }
+
+    // timeOfDayMin must be between 0 and 1439 (start and end of day)
+    if (!Number.isInteger(timeOfDayMin) || timeOfDayMin < 0 || timeOfDayMin > 1439) {
+      reminder.timeMessageError = 'Event time must be within the start and end of the day (0 to 1439).';
+      return false;
+    }
+
+    // Event duration must be positive (zero for instant event)
+    if (!Number.isInteger(eventDurationMin) || eventDurationMin < 0) {
+      reminder.timeMessageError = 'Event duration must be positive (0 for instant events).';
+      return false;
+    }
+
+    // Daily reminder cannot be more than a day
+    const maxDailyDuration = getRecurrenceEventDuration('daily');
+    if (eventDurationMin > maxDailyDuration) {
+      reminder.timeMessageError = 'Daily reminder cannot last more than a day.';
+      return false;
+    }
+
+    // Convert notification offset to negative for recurring reminders (used in generation)
+    const recurringNotifOffset = reminder.recurrence.daily.notifOffsetTimeMin == null ? 0 : -Math.abs(reminder.recurrence.daily.notifOffsetTimeMin); 
+    // If a notification option (remind me) is not never, series has notifications
+    const hasNotification = reminder.recurrence.daily.notifOffsetTimeMin != null;
+
+    const startTime = normalizeDatePickerToCalendar(reminder.date) ?? reminder.date;
+    const endTime = normalizeDatePickerToCalendar(reminder.recurrence.daily.seriesEndDate) ?? reminder.recurrence.daily.seriesEndDate;
+    const seriesStartTime = convertTimeAndDateToTimestamp(startTime, '00:00');
+    const seriesEndTime = convertTimeAndDateToTimestamp(endTime, '23:59');
+
+  // End day must be provided
+    if (!reminder.recurrence.daily.seriesEndDate) {
+      reminder.timeMessageError = 'Please select a valid event end date for series.';
+      return false;
+    }
+
+    // Compare exact moment in time if series start time is before series end time, if not, error
+    const startEpoch = timeStamptoEpoch(seriesStartTime);
+    const endEpoch = timeStamptoEpoch(seriesEndTime);
+    if (endEpoch < startEpoch) {
+      reminder.timeMessageError = 'Start time must be before end time.';
+      return false;
+    }
+
+    // Make sure recurring reminder is saved in preexisting folder
+  if (reminder.temporaryFolderID == null || !folders.value.some(folder => String(folder.folderID) === String(reminder.temporaryFolderID))) {
+    reminder.folderMessageError = 'Reminder must be in a existing folder.';
+    return false;
+  }
+
+   // eventType must be integer value 
+  if (!Number.isInteger(reminder.eventType)) {
+    reminder.titleMessageError = 'Invalid event type selected.';
+    return false;
+  }
+
+    // All validation passes
+    try {
+    // Build event type extensions from UI fields
+    const extensions = buildExtensionsForEventType(reminder);
+    // Only send an extension if there are fields to send (otherwise undefined so DB doesn't make an extension)
+    const extensionsToSend = (extensions && extensions.length > 0) ? extensions : undefined;
+      // Recurring reminder not saved to DB yet, create it
+      if (!reminder.isSaved) {
+      const seriesID = await createDailyReminder(reminder.temporaryFolderID, reminder.eventType, seriesStartTime, seriesEndTime, timeOfDayMin, eventDurationMin, recurringNotifOffset, hasNotification, everyNDays, reminder.temporaryTitle, extensionsToSend);
+
+        // Since recurring is not displayed in list/calendar (not mapped to UI card), update series ID and isSaved
+        reminder.itemID = seriesID;
+        reminder.isSaved = true;
+
+        folders.value = mapDBToUIFolder(await readAllFolders());
+        reminder.timeMessageError = '';
+        return true;
+      }
+      // Recurring reminder saved before, update it
+      else {
+          await updateDailyReminder(reminder.itemID, reminder.temporaryFolderID, reminder.eventType, seriesStartTime, seriesEndTime, timeOfDayMin, eventDurationMin, recurringNotifOffset, hasNotification, everyNDays, reminder.temporaryTitle, extensionsToSend);
+          folders.value = mapDBToUIFolder(await readAllFolders());
+          reminder.timeMessageError = '';
+          return true;
+      }
+    }
+    catch (err) {
+      console.error('Error saving recurring reminder.');
+      return false;
+    }
+
+  }
+}
+
 // Function to save reminder fields when save button is clicked
 async function saveReminder(reminder: UIReminder){
   // If reminder title (with whitespace removed) is empty, show error message and disable save button
@@ -1892,16 +2100,30 @@ async function saveReminder(reminder: UIReminder){
     return;
   }
   // eventType must be integer value 
-  if (typeof reminder.eventType !== 'number' || !Number.isInteger(reminder.eventType)) {
+  if (!Number.isInteger(reminder.eventType)) {
     reminder.titleMessageError = 'Invalid event type selected.';
     return;
   }
   // Folder must exist
   // Checks if folder id (temporary folder) matches any existing folder ids in folders array
   if (reminder.temporaryFolderID == null || !folders.value.some(folder => String(folder.folderID) === String(reminder.temporaryFolderID))) {
-    reminder.folderMessageError = 'Reminder must be in a existing folder';
+    reminder.folderMessageError = 'Reminder must be in a existing folder.';
     return;
   }
+
+  // If reminder is recurring, save it separately and return
+  const recurringReminder = await saveRecurringReminder(reminder);
+  // If saveRecurringReminder returned true, the save was successful
+  if (recurringReminder) {
+    return;
+  }
+
+  // If recurring reminder returned false by failing validation, stop
+   if (!recurringReminder && reminder.timeMessageError) {
+   return;
+ }
+
+  // Continue with normal reminder saving
   
   const extension = reminder.extension ?? {};
 
@@ -1917,7 +2139,6 @@ async function saveReminder(reminder: UIReminder){
     const fieldString = String(fieldRawValue).trim();
     return fieldString === '' ? undefined : fieldString;
   };
-
 
   let startTimeStr = '';
   let endTimeStr = '';
@@ -2280,6 +2501,7 @@ const filteredReminders = computed(() => {
   // Normalize search query: remove whitespace and convert to lowercase for case-insensitive matching
   // Search functionality example: https://stackoverflow.com/questions/74670957/how-to-display-search-results-using-react-typescript
   const query = (searchQuery.value ?? '').trim().toLowerCase();
+
   if (!searchQuery.value) {
     // If no search query, default show reminders for selected calendar date
     return reminders.value.filter(reminder => reminder.date === selectedDate.value);

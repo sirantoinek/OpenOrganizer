@@ -2,7 +2,7 @@
 /*
  * Authors: Rachel Patella
  * Created: 2025-10-21
- * Updated: 2025-11-16
+ * Updated: 2025-11-17
  *
  * This file contains interfaces that extend the shared-types with UI-specific fields.
  *
@@ -68,8 +68,9 @@ export type recurrenceReminder = {
   yearly?: yearlyReminder;
 };
 
+// Frontend treats these fields as strings when binding v-model, will be converted to number when performing DB operations
 export type dailyReminder = {
-  timeOfDayMin: string;
+  timeOfDayMin: number;
   eventDurationMin: number;
   notifOffsetTimeMin: number | null;
   everyNDays: number;
@@ -86,7 +87,7 @@ export type weeklyReminder = {
 };
 
 export type monthlyReminder = {
-  timeOfDayMin: string;
+  timeOfDayMin: number;
   eventDurationMin: number;
   notifOffsetTimeMin: number | null;
   lastDayOfMonth: boolean;
@@ -95,7 +96,7 @@ export type monthlyReminder = {
 };
 
 export type yearlyReminder = {
-  timeOfDayMin: string;
+  timeOfDayMin: number;
   eventDurationMin: number;
   notifOffsetTimeMin: number | null;
   dayOfYear: number;

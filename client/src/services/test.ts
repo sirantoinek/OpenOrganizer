@@ -1,7 +1,7 @@
 /*
  * Authors: Michael Jagiello
  * Created: 2025-11-04
- * Updated: 2025-11-13
+ * Updated: 2025-11-17
  *
  * This file defines the entry testing suite function and the function used to test the Renderer.
  *
@@ -13,17 +13,25 @@
 import { convertTimeAndDateToTimestamp } from "src/frontend-utils/time";
 import * as validate from "../utils/validate"
 import * as eventtypes from "../utils/eventtypes"
+import * as ldb from "../utils/local-db"
 
-export function TestingSuite() {
-  TestingSuiteRenderer();
-  //TestingSuiteElectron();
+export async function TestingSuite() {
+  await TestingSuiteRenderer();
 }
 
-function TestingSuiteRenderer() {
+async function TestingSuiteRenderer() {
+  await sleep(1000); // ensures all handlers assigned and everything else initialized
   Test_ValidateUsername();
   Test_ValidatePassword();
   Test_Flight();
   Test_Hotel();
+  await Test_Notes();
+  await Test_Reminders();
+  await Test_Daily();
+  await Test_Weekly();
+  await Test_Monthly();
+  await Test_Yearly();
+
   let successes = 0;
   for (const b of results) {
     if (b) successes++;
@@ -48,6 +56,10 @@ function Test(expected: boolean, result: string | boolean, prefix?: string) {
     results.push(expected == result);
     if (expected != result) console.log(prefix);
   }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 // test cases
@@ -268,4 +280,188 @@ function Test_Hotel() {
   Test(true, validate.MatchStrings(timezoneAbbrev, hotelExt.timezoneAbbrev, "timezoneAbbrev"));
   Test(true, validate.MatchStrings(timezoneOffset, hotelExt.timezoneOffset, "timezoneOffset"));
   Test(true, validate.MatchStrings(roomNumber, hotelExt.roomNumber, "roomNumber"));
+}
+
+async function Test_Notes() {
+  await ldb.clearAllTables();
+  await ldb.createRootFolder(0);
+
+  const note1ID = await ldb.createNote(0n, "note1", "contents1");
+  const note1 = await ldb.readNote(note1ID);
+  Test(true, note1.folderID == 0n, "note1 folder ID must match");
+  Test(true, note1.title == "note1", "note1 title must match");
+  Test(true, note1.text == "contents1", "note1 text must match");
+  Test(true, note1.extensions!.length == 0, "note1 extensions must be 0 in length");
+
+  await sleep(5);
+  const note2ID = await ldb.createNote(0n, "note2", "contentscontentscontentscontentscontentscontentscontentscontents2");
+  const note2 = await ldb.readNote(note2ID);
+  Test(true, note2.folderID == 0n, "note2 folder ID must match");
+  Test(true, note2.title == "note2", "note2 title must match");
+  Test(true, note2.text == "contentscontentscontentscontentscontentscontentscontentscontents2", "note2 text must match"); // extension data is reapplied to text field
+  Test(true, note2.extensions!.length == 1 && note2.extensions![0]!.data == "2", "note2 extensions must be undefined");
+}
+
+async function Test_Reminders() {
+  await ldb.clearAllTables();
+  await ldb.createRootFolder(0);
+
+  const startStamp1 = convertTimeAndDateToTimestamp("2001-01-01", "00:00");
+  const endStamp1 = convertTimeAndDateToTimestamp("2001-12-31", "23:59");
+  const reminder1ID = await ldb.createReminder(0n, 0, startStamp1, endStamp1, startStamp1, true, "rem1");
+  const reminder1 = await ldb.readReminder(reminder1ID);
+  Test(true, reminder1.eventStartYear == 2001 && reminder1.eventStartDay == 1 && reminder1.eventStartMin == 0, "reminder1 event start time must match");
+  Test(true, reminder1.eventEndYear == 2001 && reminder1.eventEndDay == 365 && reminder1.eventEndMin == 1439, "reminder1 event end time must match");
+  Test(true, reminder1.notifYear == 2001 && reminder1.notifDay == 1 && reminder1.notifMin == 0, "reminder1 notif time must match");
+  Test(true, reminder1.hasNotif == 1, "reminder1 must have notif");
+  Test(true, reminder1.title == "rem1", "reminder1 title must match");
+
+  await sleep(5);
+  const startStamp2 = convertTimeAndDateToTimestamp("2004-01-02", "01:00");
+  const endStamp2 = convertTimeAndDateToTimestamp("2004-12-30", "22:59");
+  const reminder2ID = await ldb.createReminder(0n, 0, startStamp2, endStamp2, startStamp2, false, "rem2");
+  const reminder2 = await ldb.readReminder(reminder2ID);
+  Test(true, reminder2.eventStartYear == 2004 && reminder2.eventStartDay == 2 && reminder2.eventStartMin == 60, "reminder2 event start time must match");
+  Test(true, reminder2.eventEndYear == 2004 && reminder2.eventEndDay == 365 && reminder2.eventEndMin == 1379, "reminder2 event end time must match");
+  Test(true, reminder2.notifYear == 2004 && reminder2.notifDay == 2 && reminder2.notifMin == 60, "reminder2 notif time must match");
+  Test(true, reminder2.hasNotif == 0, "reminder2 must have notif");
+  Test(true, reminder2.title == "rem2", "reminder2 title must match");
+}
+
+async function Test_Daily() {
+  await ldb.clearAllTables();
+  await ldb.createRootFolder(0);
+
+  const startStamp1 = convertTimeAndDateToTimestamp("2001-01-01", "00:00");
+  const endStamp1 = convertTimeAndDateToTimestamp("2001-12-31", "23:59");
+  const timeOfDayMin1 = 10, eventDurationMin1 = 10, notifOffsetTimeMin1 = -1, hasNotifs1 = true;
+  const everyNDays1 = 1;
+  const daily1ID = await ldb.createDailyReminder(0n, 0, startStamp1, endStamp1, timeOfDayMin1, eventDurationMin1, notifOffsetTimeMin1, hasNotifs1, everyNDays1, "daily1");
+  const daily1 = await ldb.readDailyReminder(daily1ID);
+  Test(true, daily1.seriesStartYear == 2001 && daily1.seriesStartDay == 1 && daily1.seriesStartMin == 0, "daily1 series start time must match");
+  Test(true, daily1.seriesEndYear == 2001 && daily1.seriesEndDay == 365 && daily1.seriesEndMin == 1439, "daily1 series end time must match");
+  Test(true, daily1.timeOfDayMin == timeOfDayMin1, "daily1 time of day must match");
+  Test(true, daily1.eventDurationMin == eventDurationMin1, "daily1 event duration must match");
+  Test(true, daily1.notifOffsetTimeMin == notifOffsetTimeMin1, "daily1 notif offset time must match");
+  Test(true, daily1.hasNotifs == Number(hasNotifs1), "daily1 has notifs must match");
+  Test(true, daily1.everyNDays == everyNDays1, "daily1 every n days must match");
+
+  await sleep(5);
+  const startStamp2 = convertTimeAndDateToTimestamp("2004-01-02", "01:00");
+  const endStamp2 = convertTimeAndDateToTimestamp("2004-12-30", "22:59");
+  const timeOfDayMin2 = 600, eventDurationMin2 = 1, notifOffsetTimeMin2 = -10, hasNotifs2 = false;
+  const everyNDays2 = 1;
+  const daily2ID = await ldb.createDailyReminder(0n, 0, startStamp2, endStamp2, timeOfDayMin2, eventDurationMin2, notifOffsetTimeMin2, hasNotifs2, everyNDays2, "daily2");
+  const daily2 = await ldb.readDailyReminder(daily2ID);
+  Test(true, daily2.seriesStartYear == 2004 && daily2.seriesStartDay == 2 && daily2.seriesStartMin == 60, "daily2 series start time must match");
+  Test(true, daily2.seriesEndYear == 2004 && daily2.seriesEndDay == 365 && daily2.seriesEndMin == 1379, "daily2 series end time must match");
+  Test(true, daily2.timeOfDayMin == timeOfDayMin2, "daily2 time of day must match");
+  Test(true, daily2.eventDurationMin == eventDurationMin2, "daily2 event duration must match");
+  Test(true, daily2.notifOffsetTimeMin == notifOffsetTimeMin2, "daily2 notif offset time must match");
+  Test(true, daily2.hasNotifs == Number(hasNotifs2), "daily2 has notifs must match");
+  Test(true, daily2.everyNDays == everyNDays2, "daily2 every n days must match");
+}
+
+async function Test_Weekly() {
+  await ldb.clearAllTables();
+  await ldb.createRootFolder(0);
+
+  const startStamp1 = convertTimeAndDateToTimestamp("2001-01-01", "00:00");
+  const endStamp1 = convertTimeAndDateToTimestamp("2001-12-31", "23:59");
+  const timeOfDayMin1 = 10, eventDurationMin1 = 10, notifOffsetTimeMin1 = -1, hasNotifs1 = true;
+  const everyNWeeks1 = 1, daysOfWeek1 = "1110111";
+  const weekly1ID = await ldb.createWeeklyReminder(0n, 0, startStamp1, endStamp1, timeOfDayMin1, eventDurationMin1, notifOffsetTimeMin1, hasNotifs1, everyNWeeks1, daysOfWeek1, "weekly1");
+  const weekly1 = await ldb.readWeeklyReminder(weekly1ID);
+  Test(true, weekly1.seriesStartYear == 2001 && weekly1.seriesStartDay == 1 && weekly1.seriesStartMin == 0, "weekly1 series start time must match");
+  Test(true, weekly1.seriesEndYear == 2001 && weekly1.seriesEndDay == 365 && weekly1.seriesEndMin == 1439, "weekly1 series end time must match");
+  Test(true, weekly1.timeOfDayMin == timeOfDayMin1, "weekly1 time of day must match");
+  Test(true, weekly1.eventDurationMin == eventDurationMin1, "weekly1 event duration must match");
+  Test(true, weekly1.notifOffsetTimeMin == notifOffsetTimeMin1, "weekly1 notif offset time must match");
+  Test(true, weekly1.hasNotifs == Number(hasNotifs1), "weekly1 has notifs must match");
+  Test(true, weekly1.everyNWeeks == everyNWeeks1, "weekly1 every n weeks must match");
+  Test(true, weekly1.daysOfWeek == daysOfWeek1, "weekly1 days of week must match");
+
+  await sleep(5);
+  const startStamp2 = convertTimeAndDateToTimestamp("2004-01-02", "01:00");
+  const endStamp2 = convertTimeAndDateToTimestamp("2004-12-30", "22:59");
+  const timeOfDayMin2 = 600, eventDurationMin2 = 1, notifOffsetTimeMin2 = -10, hasNotifs2 = false;
+  const everyNWeeks2 = 1, daysOfWeek2 = "0001000";
+  const weekly2ID = await ldb.createWeeklyReminder(0n, 0, startStamp2, endStamp2, timeOfDayMin2, eventDurationMin2, notifOffsetTimeMin2, hasNotifs2, everyNWeeks2, daysOfWeek2, "weekly2");
+  const weekly2 = await ldb.readWeeklyReminder(weekly2ID);
+  Test(true, weekly2.seriesStartYear == 2004 && weekly2.seriesStartDay == 2 && weekly2.seriesStartMin == 60, "weekly2 series start time must match");
+  Test(true, weekly2.seriesEndYear == 2004 && weekly2.seriesEndDay == 365 && weekly2.seriesEndMin == 1379, "weekly2 series end time must match");
+  Test(true, weekly2.timeOfDayMin == timeOfDayMin2, "weekly2 time of day must match");
+  Test(true, weekly2.eventDurationMin == eventDurationMin2, "weekly2 event duration must match");
+  Test(true, weekly2.notifOffsetTimeMin == notifOffsetTimeMin2, "weekly2 notif offset time must match");
+  Test(true, weekly2.hasNotifs == Number(hasNotifs2), "weekly2 has notifs must match");
+  Test(true, weekly2.everyNWeeks == everyNWeeks2, "weekly2 every n weeks must match");
+  Test(true, weekly2.daysOfWeek == daysOfWeek2, "weekly2 days of week must match");
+}
+
+async function Test_Monthly() {
+  await ldb.clearAllTables();
+  await ldb.createRootFolder(0);
+
+  const startStamp1 = convertTimeAndDateToTimestamp("2001-01-01", "00:00");
+  const endStamp1 = convertTimeAndDateToTimestamp("2001-12-31", "23:59");
+  const timeOfDayMin1 = 10, eventDurationMin1 = 10, notifOffsetTimeMin1 = -1, hasNotifs1 = true;
+  const lastDayOfMonth1 = false, daysOfMonth1 = "1111000000000000000000000000000";
+  const monthly1ID = await ldb.createMonthlyReminder(0n, 0, startStamp1, endStamp1, timeOfDayMin1, eventDurationMin1, notifOffsetTimeMin1, hasNotifs1, lastDayOfMonth1, daysOfMonth1, "monthly1");
+  const monthly1 = await ldb.readMonthlyReminder(monthly1ID);
+  Test(true, monthly1.seriesStartYear == 2001 && monthly1.seriesStartDay == 1 && monthly1.seriesStartMin == 0, "monthly1 series start time must match");
+  Test(true, monthly1.seriesEndYear == 2001 && monthly1.seriesEndDay == 365 && monthly1.seriesEndMin == 1439, "monthly1 series end time must match");
+  Test(true, monthly1.timeOfDayMin == timeOfDayMin1, "monthly1 time of day must match");
+  Test(true, monthly1.eventDurationMin == eventDurationMin1, "monthly1 event duration must match");
+  Test(true, monthly1.notifOffsetTimeMin == notifOffsetTimeMin1, "monthly1 notif offset time must match");
+  Test(true, monthly1.hasNotifs == Number(hasNotifs1), "monthly1 has notifs must match");
+  Test(true, monthly1.lastDayOfMonth == Number(lastDayOfMonth1), "monthly1 last day of month must match");
+  Test(true, monthly1.daysOfMonth == daysOfMonth1, "monthly1 days of month must match");
+
+  await sleep(5);
+  const startStamp2 = convertTimeAndDateToTimestamp("2004-01-02", "01:00");
+  const endStamp2 = convertTimeAndDateToTimestamp("2004-12-30", "22:59");
+  const timeOfDayMin2 = 600, eventDurationMin2 = 1, notifOffsetTimeMin2 = -10, hasNotifs2 = false;
+  const lastDayOfMonth2 = false, daysOfMonth2 = "0000000000000000000000000001111";
+  const monthly2ID = await ldb.createMonthlyReminder(0n, 0, startStamp2, endStamp2, timeOfDayMin2, eventDurationMin2, notifOffsetTimeMin2, hasNotifs2, lastDayOfMonth2, daysOfMonth2, "monthly2");
+  const monthly2 = await ldb.readMonthlyReminder(monthly2ID);
+  Test(true, monthly2.seriesStartYear == 2004 && monthly2.seriesStartDay == 2 && monthly2.seriesStartMin == 60, "monthly2 series start time must match");
+  Test(true, monthly2.seriesEndYear == 2004 && monthly2.seriesEndDay == 365 && monthly2.seriesEndMin == 1379, "monthly2 series end time must match");
+  Test(true, monthly2.timeOfDayMin == timeOfDayMin2, "monthly2 time of day must match");
+  Test(true, monthly2.eventDurationMin == eventDurationMin2, "monthly2 event duration must match");
+  Test(true, monthly2.notifOffsetTimeMin == notifOffsetTimeMin2, "monthly2 notif offset time must match");
+  Test(true, monthly2.hasNotifs == Number(hasNotifs2), "monthly2 has notifs must match");
+  Test(true, monthly2.lastDayOfMonth == Number(lastDayOfMonth2), "monthly2 last day of month must match");
+  Test(true, monthly2.daysOfMonth == daysOfMonth2, "monthly2 days of month must match");
+}
+
+async function Test_Yearly() {
+  await ldb.clearAllTables();
+  await ldb.createRootFolder(0);
+
+  const startStamp1 = convertTimeAndDateToTimestamp("2001-01-01", "00:00");
+  const endStamp1 = convertTimeAndDateToTimestamp("2001-12-31", "23:59");
+  const timeOfDayMin1 = 10, eventDurationMin1 = 10, notifOffsetTimeMin1 = -1, hasNotifs1 = true, everyNDays1 = 1;
+  const yearly1ID = await ldb.createYearlyReminder(0n, 0, startStamp1, endStamp1, timeOfDayMin1, eventDurationMin1, notifOffsetTimeMin1, hasNotifs1, startStamp1, "yearly1");
+  const yearly1 = await ldb.readYearlyReminder(yearly1ID);
+  Test(true, yearly1.seriesStartYear == 2001 && yearly1.seriesStartDay == 1 && yearly1.seriesStartMin == 0, "yearly1 series start time must match");
+  Test(true, yearly1.seriesEndYear == 2001 && yearly1.seriesEndDay == 365 && yearly1.seriesEndMin == 1439, "yearly1 series end time must match");
+  Test(true, yearly1.timeOfDayMin == timeOfDayMin1, "yearly1 time of day must match");
+  Test(true, yearly1.eventDurationMin == eventDurationMin1, "yearly1 event duration must match");
+  Test(true, yearly1.notifOffsetTimeMin == notifOffsetTimeMin1, "yearly1 notif offset time must match");
+  Test(true, yearly1.hasNotifs == Number(hasNotifs1), "yearly1 has notifs must match");
+  Test(true, yearly1.dayOfYear == 1, "yearly1 day of year must match");
+
+  await sleep(5);
+  const startStamp2 = convertTimeAndDateToTimestamp("2004-01-02", "01:00");
+  const endStamp2 = convertTimeAndDateToTimestamp("2004-12-30", "22:59");
+  const timeOfDayMin2 = 600, eventDurationMin2 = 1, notifOffsetTimeMin2 = -10, hasNotifs2 = false, everyNDays2 = 1;
+  const yearly2ID = await ldb.createYearlyReminder(0n, 0, startStamp2, endStamp2, timeOfDayMin2, eventDurationMin2, notifOffsetTimeMin2, hasNotifs2, startStamp2, "yearly2");
+  const yearly2 = await ldb.readYearlyReminder(yearly2ID);
+  Test(true, yearly2.seriesStartYear == 2004 && yearly2.seriesStartDay == 2 && yearly2.seriesStartMin == 60, "yearly2 series start time must match");
+  Test(true, yearly2.seriesEndYear == 2004 && yearly2.seriesEndDay == 365 && yearly2.seriesEndMin == 1379, "yearly2 series end time must match");
+  Test(true, yearly2.timeOfDayMin == timeOfDayMin2, "yearly2 time of day must match");
+  Test(true, yearly2.eventDurationMin == eventDurationMin2, "yearly2 event duration must match");
+  Test(true, yearly2.notifOffsetTimeMin == notifOffsetTimeMin2, "yearly2 notif offset time must match");
+  Test(true, yearly2.hasNotifs == Number(hasNotifs2), "yearly2 has notifs must match");
+  Test(true, yearly2.dayOfYear == 2, "yearly2 day of year must match");
 }

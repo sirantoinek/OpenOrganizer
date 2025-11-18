@@ -1,7 +1,7 @@
 /*
  * Authors: Kevin Sirantoine
  * Created: 2025-10-13
- * Updated: 2025-11-13
+ * Updated: 2025-11-17
  *
  * This file contains functions that perform CRUD operations on the local SQLite database through the IPC to provide
  * database access to the renderer process.
@@ -128,6 +128,8 @@ export async function createDailyReminder(
     newDailyRem.extensions = extensions;
   }
   await window.sqliteAPI.createDailyReminder(newDailyRem);
+  // Return timestamp ID of recurring reminder to use in frontend
+  return timeMs; 
 }
 
 export async function createWeeklyReminder(
@@ -164,6 +166,8 @@ export async function createWeeklyReminder(
     newWeeklyRem.extensions = extensions;
   }
   await window.sqliteAPI.createWeeklyReminder(newWeeklyRem);
+  // Return timestamp ID of recurring reminder to use in frontend
+  return timeMs; 
 }
 
 export async function createMonthlyReminder(
@@ -200,6 +204,8 @@ export async function createMonthlyReminder(
     newMonthlyRem.extensions = extensions;
   }
   await window.sqliteAPI.createMonthlyReminder(newMonthlyRem);
+  // Return timestamp ID of recurring reminder to use in frontend
+  return timeMs; 
 }
 
 export async function createYearlyReminder(
@@ -241,6 +247,8 @@ export async function createYearlyReminder(
     newYearlyRem.extensions = extensions;
   }
   await window.sqliteAPI.createYearlyReminder(newYearlyRem);
+  // Return timestamp ID of recurring reminder to use in frontend
+  return timeMs; 
 }
 
 export async function createOrUpdateOverride(

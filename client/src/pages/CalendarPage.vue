@@ -1,7 +1,7 @@
 <!--
  * Authors: Rachel Patella, Maria Pasaylo, Michael Jagiello
  * Created: 2025-09-22
- * Updated: 2025-11-17
+ * Updated: 2025-11-19
  *
  * This file is the main home page that includes the calendar view, notes/reminders list, 
  * and a file explorer as a 3 column grid layout.
@@ -142,6 +142,7 @@
                   placeholder="Folder name"
                   style="min-width: 160px;"
                   maxlength="24"
+                  autofocus
                 />
               </template>
               <template v-else-if="getReminder(node.id) && getReminder(node.id)!.isEditing">
@@ -771,7 +772,7 @@ import { ref, computed, watch, onMounted } from 'vue';
 import type { UINote, UIReminder, UIFolder } from '../types/ui-types';
 import type { Reminder, DailyReminder, WeeklyReminder, MonthlyReminder, YearlyReminder, Note, Folder, Extension } from '../../src-electron/types/shared-types';
 import {createNote, createReminder, createDailyReminder, createWeeklyReminder, createMonthlyReminder, createYearlyReminder, createOrUpdateOverride, createFolder, createRootFolder,
-  readNote, readNotesInRange, readReminder, readDailyReminder, readWeeklyReminder, readMonthlyReminder, readYearlyReminder, readRemindersInRange, readDailyRemindersInRange, readAllFolders, 
+  readNote, readNotesInRange, readReminder, readDailyReminder, readWeeklyReminder, readMonthlyReminder, readYearlyReminder, readRemindersInRange, readDailyRemindersInRange, readWeeklyRemindersInRange, readMonthlyRemindersInRange, readYearlyRemindersInRange, readGeneratedRemindersInRange, readAllFolders, 
   updateNote, updateReminder, updateDailyReminder, updateWeeklyReminder, updateMonthlyReminder, updateYearlyReminder, updateFolder, 
   deleteItem, deleteFolder} from '../utils/local-db';
 import { FieldsToFlight, FieldsToHotel, FlightToExtensions, HotelToExtensions, ExtensionsToFlight, ExtensionsToHotel } from '../utils/eventtypes';
@@ -1105,6 +1106,8 @@ async function onToggleCloudSync() {
 function onToggleRecurrenceType(item: UIReminder, enabled: boolean) {
   // isRecurring property uses checkbox value from user
   item.isRecurring = enabled;
+  // Clear time errors when toggling recurrence types
+  item.timeMessageError = '';
   // If checkbox is enabled, initialize a default recurrence
   if (enabled) {
     item.recurrence = { 
@@ -1116,9 +1119,15 @@ function onToggleRecurrenceType(item: UIReminder, enabled: boolean) {
     everyNDays: 1,
     seriesEndDate: '' 
   }};
+  // Make sure normal saved reminder is still visible in middle list while changing it to recurring
+  if (item.isSaved) {
+    item.isConverting = true;
+  }
   } else {
     // If disabled, clear recurrence type
     item.recurrence = null;
+    // Checkbox is disabled, reminder isnt becoming recurring
+    item.isConverting = false;
   }
 }
 
@@ -1296,17 +1305,27 @@ function renameTreeNode() {
 }
 
 // On escape when editing, cancel rename and revert back to original name
+// If escape on a draft (not saved, remove it entirely)
 function cancelRename(item: UIReminder | UINote | UIFolder) {
   if (!item) return;
 
   // Distinguish between folder and reminder/note by checking for unique property
   // Rename a folder
   if ('temporaryFolderName' in item) {
-    item.isEditing = false;
-    item.temporaryFolderName = item.folderName;
-    item.folderNameError = '';
-    return;
-  } 
+    // Folder is a draft, remove from UI
+    if (!item.isSaved) {
+      folders.value = folders.value.filter(f => String(f.folderID) !== String(item.folderID));
+      // Clear tree node selection
+      selectedFolderID.value = null;
+      }
+      else {
+        item.isEditing = false;
+      item.temporaryFolderName = item.folderName;
+      item.folderNameError = '';
+      }
+      return;
+    }
+   
   // Rename a reminder
   else if ('temporaryEventStartTime' in item) {
     item.isEditing = false;
@@ -1344,7 +1363,7 @@ function addReminder() {
   // create a UI-only draft reminder with a temporary negative bigint ID
   const tempID = tempIDCounter--;
   // Folder to save reminder in is either root by default if nothing is selected, otherwise selected folder in tree
-  const folderID = selectedFolderID.value ?? 0n;
+  const folderID = normalizeFolderID(selectedFolderID.value, notes.value, reminders.value, folders.value) ?? 0n;
 
   const draft: UIReminder = {
     itemID: tempID,
@@ -1369,7 +1388,8 @@ function addReminder() {
     isSelected: false,
     expanded: true,
     temporaryEventEndDateEnabled: false,
-    isRecurring: false
+    isRecurring: false,
+    isConverting: false
   } as UIReminder;
 
   // Add draft reminder to reminders array for UI rendering
@@ -1514,7 +1534,7 @@ function addNote() {
   // create a UI-only draft note with a temporary negative bigint ID
   const tempID = tempIDCounter--;
    // Folder to save note in is either root by default if nothing is selected, otherwise selected folder in tree
-  const folderID = selectedFolderID.value ?? 0n;
+  const folderID = normalizeFolderID(selectedFolderID.value, notes.value, reminders.value, folders.value) ?? 0n;
 
    const draft: UINote = {
     itemID: tempID,
@@ -1688,6 +1708,8 @@ function mapDBToUIReminder(row: Reminder, upsert: boolean): UIReminder {
     // Add on UI specific fields
     temporaryTitle: row.title ?? '',
     extension: extensionsUI,
+    // Normal reminders have no recurrence type
+    originalRecurrenceType: null,
     temporaryEventStartTime: startStr,
     temporaryEventEndTime: endStr,
     temporaryEventEndDay: normalizeDatePickerToCalendar(endDateString) ?? dateString, // Default end day is same as start day (not multi-day)
@@ -1702,6 +1724,7 @@ function mapDBToUIReminder(row: Reminder, upsert: boolean): UIReminder {
     isEditing: false,
     isSelected: false,
     isRecurring: false,
+    isConverting: false,
     expanded: true
   } as UIReminder;
 
@@ -1756,6 +1779,12 @@ function mapDBSeriesToUIRecurringReminder(row: DailyReminder | WeeklyReminder | 
   // Build recurrence object for UI based on recurrence type
   let recurrence: UIReminder['recurrence'] = null;
 
+  // Determine notification offset display dependent on if recurring reminder has notifications
+  const notificationOffset = row.notifOffsetTimeMin;
+  const hasNotification = row.hasNotifs;
+  // If notification flag is set, convert the notificaiton offset to display or null for never
+  const UINotificationOffset = hasNotification ? Math.abs(notificationOffset ?? 0) : null;
+
   if (recurrenceType === 'daily') {
     // If recurrence type is daily, treat DB row as daily reminder schema
     const dailyReminder = row as DailyReminder;
@@ -1764,7 +1793,7 @@ function mapDBSeriesToUIRecurringReminder(row: DailyReminder | WeeklyReminder | 
       daily: {
         timeOfDayMin: dailyReminder.seriesStartMin,
         eventDurationMin: dailyReminder.eventDurationMin,
-        notifOffsetTimeMin: dailyReminder.notifOffsetTimeMin,
+        notifOffsetTimeMin: UINotificationOffset,
         everyNDays: dailyReminder.everyNDays,
         seriesEndDate: normalizeDatePickerToCalendar(endDateString) ?? endDateString
       }
@@ -1825,14 +1854,15 @@ function mapDBSeriesToUIRecurringReminder(row: DailyReminder | WeeklyReminder | 
     // Add on UI specific fields
     temporaryTitle: row.title ?? '',
     extension: extensionsUI,
-
+    // Get recurrence type from DB row loaded into the UI
+    originalRecurrenceType: recurrence?.type ?? recurrenceType,
     // Event start time, end time, end day, end date are all unique to non-recurring reminders, override these fields for recurring 
     temporaryEventStartTime: '',
     temporaryEventEndTime: '',
     temporaryEventEndDay: '', // No multi-day support for recurring
     temporaryEventEndDateEnabled: false, // No multi-day support for recurring
     // Temp notification time is same as notifOffsetTimeMin for recurring reminders (but positive)
-    temporaryNotificationTime: ('notifOffsetTimeMin' in row) ? Math.abs(row.notifOffsetTimeMin ?? 0) : null,
+    temporaryNotificationTime: UINotificationOffset,
     eventStartYear: row.seriesStartYear,
     eventStartDay: row.seriesStartDay,
     eventStartMin: row.seriesStartMin,
@@ -1854,6 +1884,7 @@ function mapDBSeriesToUIRecurringReminder(row: DailyReminder | WeeklyReminder | 
     isSelected: false,
     recurrence: recurrence,
     isRecurring: true,
+    isConverting: false,
     expanded: true
   } as UIReminder;
 
@@ -2004,7 +2035,7 @@ function addFolder() {
     temporaryFolderName: 'New Folder',
     isSaved: false,
     isEditing: true, // When new draft is added, automatically in editing mode to name it
-    colorCode: -1
+    colorCode: -1,
   } as UIFolder;
 
   
@@ -2161,6 +2192,11 @@ function getRecurrenceEventDuration(recurrenceType: string): number {
 // Function to validate and save recurring reminder when save button is clicked
 // Returns true if successful (passed validation and saved DB entry), false if not
 async function saveRecurringReminder(reminder: UIReminder) {
+   // clear previous errors before re-validating
+   reminder.titleMessageError = '';
+   reminder.folderMessageError = '';
+   reminder.timeMessageError = '';
+
   // Not a recurring reminder
   if (!reminder.recurrence || !reminder.isRecurring) {
     return false;
@@ -2244,6 +2280,7 @@ async function saveRecurringReminder(reminder: UIReminder) {
     const extensions = buildExtensionsForEventType(reminder);
     // Only send an extension if there are fields to send (otherwise undefined so DB doesn't make an extension)
     const extensionsToSend = (extensions && extensions.length > 0) ? extensions : undefined;
+
       // Recurring reminder not saved to DB yet, create it
       if (!reminder.isSaved) {
         const seriesID = await createDailyReminder(reminder.temporaryFolderID, reminder.eventType, seriesStartTime, seriesEndTime, timeOfDayMin, eventDurationMin, recurringNotifOffset, hasNotification, everyNDays, reminder.temporaryTitle, extensionsToSend);
@@ -2258,6 +2295,7 @@ async function saveRecurringReminder(reminder: UIReminder) {
         // Map recurring reminder to UI format
         if (row) {
           mapDBSeriesToUIRecurringReminder(row, 'daily', true);
+
         };
 
         // Load folders after creation
@@ -2268,6 +2306,9 @@ async function saveRecurringReminder(reminder: UIReminder) {
 
       // Recurring reminder saved before, update it
       else {
+        const originalRecurrenceType = reminder.originalRecurrenceType;
+         // Original recurrence type exists, so update existing recurring reminder
+        if (originalRecurrenceType) {
         await updateDailyReminder(reminder.itemID, reminder.temporaryFolderID, reminder.eventType, seriesStartTime, seriesEndTime, timeOfDayMin, eventDurationMin, recurringNotifOffset, hasNotification, everyNDays, reminder.temporaryTitle, extensionsToSend);
 
         // Fetch the updated recurring reminder from the DB 
@@ -2282,16 +2323,41 @@ async function saveRecurringReminder(reminder: UIReminder) {
         reminder.timeMessageError = '';
         return true;
       }
+      // Original recurrence type is null, reminder is normal, convert it to a series
+      else {
+      // Create new series reminder
+      const seriesID = await createDailyReminder(reminder.temporaryFolderID, reminder.eventType, seriesStartTime, seriesEndTime, timeOfDayMin, eventDurationMin, recurringNotifOffset, hasNotification, everyNDays, reminder.temporaryTitle, extensionsToSend);
+      await deleteItem(reminder.itemID, 12);
+      const row = await readDailyReminder(seriesID);
+       // Map recurring reminder to UI format
+        if (row) {
+          mapDBSeriesToUIRecurringReminder(row, 'daily', true);
+        };
+
+        // Remove old normal reminder from UI 
+        reminders.value = reminders.value.filter(r => String(r.itemID) !== String(reminder.itemID));
+
+        folders.value = mapDBToUIFolder(await readAllFolders());
+        await loadRemindersForCalendarDate(selectedDate.value);   
+        await loadRemindersForMonth(selectedDate.value);
+        reminder.timeMessageError = '';
+        return true;
+      }
     }
-    catch (err) {
-      console.error('Error saving recurring reminder.');
-      return false;
-    }
+  } catch (error) {
+    console.error('Error saving recurring reminder:', error);
+    return false;
+}
   }
 }
 
 // Function to save reminder fields when save button is clicked
 async function saveReminder(reminder: UIReminder){
+  // Clear errors before re-validating
+  reminder.titleMessageError = '';
+  reminder.folderMessageError = '';
+  reminder.timeMessageError = '';
+
   // If reminder title (with whitespace removed) is empty, show error message and disable save button
   if (!reminder.temporaryTitle.trim()) {
     reminder.titleMessageError = 'Reminder title cannot be empty.';
@@ -2468,6 +2534,43 @@ try {
   }
   // Reminder is saved, just updating a preexisting reminder
   else {
+    // If the saved reminder belongs to an existing recurring series (switching from recurring to normal and saving)
+    // Convert series into a normal reminder with its UI fields and delete the series
+    // itemID wont be found/match as recurring is in a different table schema, so need to look at original recurrence type to find which table the series is in
+      const originalRecurrenceType = reminder.originalRecurrenceType ?? reminder.recurrence?.type ?? null;
+      let tableID: number | null = null;
+      if (originalRecurrenceType === 'daily') {
+        tableID = 21;
+      } 
+      else if (originalRecurrenceType === 'weekly') {
+        tableID = 22;
+      } 
+      else if (originalRecurrenceType === 'monthly') {
+        tableID = 23;
+      } 
+      else if (originalRecurrenceType === 'yearly') {
+        tableID = 24;
+      }
+      if (reminder.isSaved && !reminder.isRecurring && tableID != null) {
+        // Create the new normal reminder
+          const itemID = await createReminder(reminder.temporaryFolderID, reminder.eventType, eventStartTime, eventEnd, notificationTimestampToSend, hasNotification, reminder.temporaryTitle, extensionsToSend);
+          // Delete the recurring series (also deletes generated reminders)
+          await deleteItem(reminder.itemID, tableID);
+          // Fetch the newly created reminder from the DB 
+          const row = await readReminder(itemID);
+  
+          // Map DB row into UI and update reminders.value array
+          if (row) {
+            mapDBToUIReminder(row, true);
+          }
+
+      folders.value = mapDBToUIFolder(await readAllFolders());
+      await loadRemindersForCalendarDate(selectedDate.value);   
+
+      // Reload calendar month to include newly added reminder
+      await loadRemindersForMonth(selectedDate.value);
+    }
+      // Reminder is a normal reminder, just update it in DB
       await updateReminder(reminder.itemID, reminder.temporaryFolderID, reminder.eventType, eventStartTime, eventEnd, notificationTimestampToSend, hasNotification, reminder.temporaryTitle, extensionsToSend);
       console.log('Reminder updated successfully in DB.');
 
@@ -2600,6 +2703,21 @@ async function deleteTreeNode() {
         return;
     }
 
+    // Check for a draft folder (negative folder ID) 
+    // Look for folder from folders array thats ID matches the negative selected node
+    const folderDraft = folders.value.find(folder => String(folder.folderID) === String(selectedNode));
+    if (folderDraft) {
+      try {
+        // Folder never been saved before (draft), remove from file explorer list
+        if (!folderDraft.isSaved) {
+          folders.value = folders.value.filter(f => String(f.folderID) !== String(folderDraft.folderID))
+        }
+
+      } catch (error) {
+        console.error('Error deleting draft folder:', error);
+      }
+    }
+
   // Tree node has a negative ID, a note or reminder is selected
   if (selectedNode < 0n) {
     const itemID = -selectedNode;
@@ -2684,10 +2802,22 @@ async function cancelReminder(reminder: UIReminder) {
     await loadRemindersForCalendarDate(selectedDate.value);
   // Reminder is saved, revert temporary fields back to saved database values
   } else {
-    const row = await readReminder(reminder.itemID); 
-    if (row) {
-      mapDBToUIReminder(row, true);
-    } 
+      // Reminder is recurring, cancel its fields back to saved DB state
+      const originalRecurrenceType = reminder.originalRecurrenceType ?? reminder.recurrence?.type ?? null;
+      // Recurring reminder is daily, read from daily table and map to UI
+      if (reminder.isRecurring && originalRecurrenceType === 'daily') {
+        const row = await readDailyReminder(reminder.itemID);
+         if (row) {
+          mapDBSeriesToUIRecurringReminder(row, 'daily', true);
+        } 
+      } 
+      // Normal reminder, read from its table and map to UI
+      else {
+        const row = await readReminder(reminder.itemID);
+        if (row) {
+          mapDBToUIReminder(row, true);
+      } 
+    }
   }
 }
 
@@ -2742,28 +2872,8 @@ const filteredReminders = computed(() => {
   // Search functionality example: https://stackoverflow.com/questions/74670957/how-to-display-search-results-using-react-typescript
   const query = (searchQuery.value ?? '').trim().toLowerCase();
 
-  // By default, middle list only shows normal reminders and recurring drafts
-  const defaultReminderList = reminders.value.filter(reminder => !reminder.isRecurring || !reminder.isSaved);
-
-  /*
-  // Only show normal reminders and recurring drafts in middle list
-  const visibleReminders = reminders.value.filter(reminder => {
-    // Show saved recurring in middle list temporarily only if selected on the file explorer
-    if (reminder.isRecurring && reminder.isSaved) {
-      // Checks for a tree node selection (tree nodes use negative itemID)
-      if (selectedFolderID.value !== null && selectedFolderID.value < 0n) {
-        const selectedNode = -selectedFolderID.value;
-        // Check if the selected tree node ID (converted to positive) matches the reminder itemID
-        if (String(reminder.itemID) === String(selectedNode)) {
-        }
-
-      
-    }
-    return true;
-  });
-  */
-
- // const noRecurringReminders = reminders.value;
+  // By default, middle list only shows normal reminders and recurring drafts (or saved reminders being converted to recurring)
+  const defaultReminderList = reminders.value.filter(reminder => !reminder.isRecurring || !reminder.isSaved || reminder.isConverting);
 
  // No search query, either show recurring reminder if selected on file explorer
  // Or show default list otherwise (normal reminders and recurring drafts)

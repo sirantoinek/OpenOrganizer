@@ -2,7 +2,7 @@
 /*
  * Authors: Rachel Patella
  * Created: 2025-10-21
- * Updated: 2025-11-17
+ * Updated: 2025-11-19
  *
  * This file contains interfaces that extend the shared-types with UI-specific fields.
  *
@@ -49,10 +49,14 @@ export type UIReminder = Reminder & {
   // useful for adding on custom event type fields/extensions that we may not know the types to yet
   // Reminder recurrence fields to fill out UI form
   recurrence?: recurrenceReminder | null;
+  // Used to determine which series table the recurring reminders itemID is from
+  originalRecurrenceType?: string | null;
   isRecurring: boolean;
   isSaved: boolean;
   isEditing: boolean; 
   isSelected: boolean;
+  // Used to see saved reminder in list while user toggles recurrence
+  isConverting: boolean;
   expanded: boolean;
   temporaryEventEndDateEnabled: boolean;
   // UI-only date field - calendar date selected for the reminder
@@ -68,7 +72,6 @@ export type recurrenceReminder = {
   yearly?: yearlyReminder;
 };
 
-// Frontend treats these fields as strings when binding v-model, will be converted to number when performing DB operations
 export type dailyReminder = {
   timeOfDayMin: number;
   eventDurationMin: number;

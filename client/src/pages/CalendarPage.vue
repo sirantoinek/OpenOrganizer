@@ -1,7 +1,7 @@
 <!--
  * Authors: Rachel Patella, Maria Pasaylo, Michael Jagiello
  * Created: 2025-09-22
- * Updated: 2025-11-19
+ * Updated: 2025-11-20
  *
  * This file is the main home page that includes the calendar view, notes/reminders list, 
  * and a file explorer as a 3 column grid layout.
@@ -289,7 +289,8 @@
                 style="background-color: #f2f2f2; margin-bottom: 10px"
               />
               <q-select
-                v-model="item.temporaryNotificationTime"
+                :model-value="getNotificationOffset(item)"
+                @update:model-value="val => setNotificationOffset(item, val)"
                 :options="notificationOptions"
                 label="Remind me:"
                 emit-value 
@@ -867,6 +868,54 @@ const recurrenceOptions = [
   { label: 'Monthly', value: 'monthly' },
   { label: 'Yearly', value: 'yearly' }
   ];
+
+  // Function to determine which variable to bind to for notification offset
+  // Normal reminders use temporaryNotificationTime field, recurring reminders use notifOffsetTimeMin
+  function getNotificationOffset(reminder: UIReminder): number | null {
+    // If reminder is recurring, bind to notifOffsetTimeMin
+    if (reminder.recurrence) {
+      if (reminder.recurrence.type === 'daily' && reminder.recurrence.daily) {
+        return reminder.recurrence.daily.notifOffsetTimeMin ?? null;
+      }
+      else if (reminder.recurrence.type === 'weekly' && reminder.recurrence.weekly) {
+        return reminder.recurrence.weekly.notifOffsetTimeMin ?? null;
+      }
+      else if (reminder.recurrence.type === 'monthly' && reminder.recurrence.monthly) {
+        return reminder.recurrence.monthly.notifOffsetTimeMin ?? null;
+      }
+      else if (reminder.recurrence.type === 'yearly' && reminder.recurrence.yearly) {
+        return reminder.recurrence.yearly.notifOffsetTimeMin ?? null;
+      }
+      // For any other recurrence type, return null (should not get here)
+      return null;
+    }
+    else {
+      // If reminder is not recurring, bind to temporaryNotificationTime
+      return reminder.temporaryNotificationTime ?? null;
+    }
+  }
+
+  // When user changes notification offset dropdown (val), update the correct field in the reminder
+  function setNotificationOffset(reminder: UIReminder, val: number| null) {
+    // If reminder is recurring, update notifOffsetTimeMin feidl to updated value
+    if (reminder.recurrence) {
+      if (reminder.recurrence.type === 'daily' && reminder.recurrence.daily) {
+        reminder.recurrence.daily.notifOffsetTimeMin = val;
+      }
+      else if (reminder.recurrence.type === 'weekly' && reminder.recurrence.weekly) {
+        reminder.recurrence.weekly.notifOffsetTimeMin = val;
+      }
+      else if (reminder.recurrence.type === 'monthly' && reminder.recurrence.monthly) {
+        reminder.recurrence.monthly.notifOffsetTimeMin = val;
+      }
+      else if (reminder.recurrence.type === 'yearly' && reminder.recurrence.yearly) {
+        reminder.recurrence.yearly.notifOffsetTimeMin = val;
+      }
+    } else {
+      // If reminder is not recurring, update temporaryNotificationTime field to updated value
+      reminder.temporaryNotificationTime = val;
+    }
+  }
 
 // Array of notes
 const notes = ref<UINote[]>([])
@@ -2152,43 +2201,6 @@ async function saveNote(note: UINote){
   }
 }
 
-// Function to limit event duration by recurrence type to prevent overlaps
-// Ex. Daily reminders cant be more than 1 day, weekly more than a week, etc.
-function getRecurrenceEventDuration(recurrenceType: string): number {
-  switch (recurrenceType) {
-    case 'daily': {
-      // Number of minutes in a day (24 hrs a day * 60 min an hr = 1140 min max)
-      // event duration cannot exceed more than 1 day (24 hours) for a daily recurring reminder
-      return 1140;
-    }
-
-    case 'weekly': {
-      // Number of minutes in a week (7 days * 24 hrs a day * 60 min an hr = 10080 min max)
-      // event duration cannot exceed more than 1 week/7 days for a weekly recurring reminder
-      return 10080;
-    }
-
-    case 'monthly': {
-      // Number of minutes in a month (28 days * 24 hrs a day * 60 min an hr = 40320 min max)
-      // event duration cannot exceed more than 1 month/28 days for a monthly recurring reminder
-      // Using 28 days for safety because using 31 days can be dangerous for a month with less (it will overlap)
-      return 40320;
-    }
-
-    case 'yearly': {
-      // Number of minutes in a year (365 days * 24 hrs a day * 60 min an hr = 525600 min max)
-      // event duration cannot exceed more than 1 year/365 days for yearly recurring reminder
-      // Using 365 days (not 366 for leap) for safety
-      return 525600;
-    }
-
-    // If nothing else matches, use daily (within a day)
-    default: {
-      return 1440;
-    }
-  }
-}
-
 // Function to validate and save recurring reminder when save button is clicked
 // Returns true if successful (passed validation and saved DB entry), false if not
 async function saveRecurringReminder(reminder: UIReminder) {
@@ -2231,10 +2243,9 @@ async function saveRecurringReminder(reminder: UIReminder) {
       return false;
     }
 
-    // Daily reminder cannot be more than a day
-    const maxDailyDuration = getRecurrenceEventDuration('daily');
-    if (eventDurationMin > maxDailyDuration) {
-      reminder.timeMessageError = 'Daily reminder cannot last more than a day.';
+    // Event duration cannot be more than a day
+    if (eventDurationMin > 1440) {
+      reminder.timeMessageError = 'Event duration cannot be more than a day.';
       return false;
     }
 
@@ -2261,6 +2272,18 @@ async function saveRecurringReminder(reminder: UIReminder) {
       reminder.timeMessageError = 'Start time must be before end time.';
       return false;
     }
+
+  // Check that frequency (everyNDays) fits in the series range
+  // Prevents recurring series that make no generated reminders (ex. series range is 2 days but frequency is every 3 days)
+  // Convert ms in time (epoch) to number of days in the series range
+  const msPerDay = 1000 * 60 * 60 * 24;
+  // Add 1 to include start and end date in the series length
+  const seriesLength = Math.floor((endEpoch - startEpoch) / msPerDay) + 1;
+
+  if (reminder.recurrence.daily.everyNDays > seriesLength) {
+    reminder.timeMessageError = 'Frequency must fit within series length.';
+    return false;
+  }
 
     // Make sure recurring reminder is saved in preexisting folder
   if (reminder.temporaryFolderID == null || !folders.value.some(folder => String(folder.folderID) === String(reminder.temporaryFolderID))) {
@@ -2327,6 +2350,7 @@ async function saveRecurringReminder(reminder: UIReminder) {
       else {
       // Create new series reminder
       const seriesID = await createDailyReminder(reminder.temporaryFolderID, reminder.eventType, seriesStartTime, seriesEndTime, timeOfDayMin, eventDurationMin, recurringNotifOffset, hasNotification, everyNDays, reminder.temporaryTitle, extensionsToSend);
+      // Delete old normal reminder
       await deleteItem(reminder.itemID, 12);
       const row = await readDailyReminder(seriesID);
        // Map recurring reminder to UI format

@@ -1,7 +1,7 @@
 /*
  * Authors: Michael Jagiello
  * Created: 2025-11-04
- * Updated: 2025-11-17
+ * Updated: 2025-11-19
  *
  * This file defines the entry testing suite function and the function used to test the Renderer.
  *
@@ -14,6 +14,7 @@ import { convertTimeAndDateToTimestamp } from "src/frontend-utils/time";
 import * as validate from "../utils/validate"
 import * as eventtypes from "../utils/eventtypes"
 import * as ldb from "../utils/local-db"
+import type { GeneratedReminder } from "app/src-electron/types/shared-types";
 
 export async function TestingSuite() {
   await TestingSuiteRenderer();
@@ -31,7 +32,10 @@ async function TestingSuiteRenderer() {
   await Test_Weekly();
   await Test_Monthly();
   await Test_Yearly();
+  await Test_GeneratedBasic();
 
+  await ldb.clearAllTables();
+  await ldb.createRootFolder(0);
   let successes = 0;
   for (const b of results) {
     if (b) successes++;
@@ -440,7 +444,7 @@ async function Test_Yearly() {
 
   const startStamp1 = convertTimeAndDateToTimestamp("2001-01-01", "00:00");
   const endStamp1 = convertTimeAndDateToTimestamp("2001-12-31", "23:59");
-  const timeOfDayMin1 = 10, eventDurationMin1 = 10, notifOffsetTimeMin1 = -1, hasNotifs1 = true, everyNDays1 = 1;
+  const timeOfDayMin1 = 10, eventDurationMin1 = 10, notifOffsetTimeMin1 = -1, hasNotifs1 = true;
   const yearly1ID = await ldb.createYearlyReminder(0n, 0, startStamp1, endStamp1, timeOfDayMin1, eventDurationMin1, notifOffsetTimeMin1, hasNotifs1, startStamp1, "yearly1");
   const yearly1 = await ldb.readYearlyReminder(yearly1ID);
   Test(true, yearly1.seriesStartYear == 2001 && yearly1.seriesStartDay == 1 && yearly1.seriesStartMin == 0, "yearly1 series start time must match");
@@ -454,7 +458,7 @@ async function Test_Yearly() {
   await sleep(5);
   const startStamp2 = convertTimeAndDateToTimestamp("2004-01-02", "01:00");
   const endStamp2 = convertTimeAndDateToTimestamp("2004-12-30", "22:59");
-  const timeOfDayMin2 = 600, eventDurationMin2 = 1, notifOffsetTimeMin2 = -10, hasNotifs2 = false, everyNDays2 = 1;
+  const timeOfDayMin2 = 600, eventDurationMin2 = 1, notifOffsetTimeMin2 = -10, hasNotifs2 = false;
   const yearly2ID = await ldb.createYearlyReminder(0n, 0, startStamp2, endStamp2, timeOfDayMin2, eventDurationMin2, notifOffsetTimeMin2, hasNotifs2, startStamp2, "yearly2");
   const yearly2 = await ldb.readYearlyReminder(yearly2ID);
   Test(true, yearly2.seriesStartYear == 2004 && yearly2.seriesStartDay == 2 && yearly2.seriesStartMin == 60, "yearly2 series start time must match");
@@ -464,4 +468,60 @@ async function Test_Yearly() {
   Test(true, yearly2.notifOffsetTimeMin == notifOffsetTimeMin2, "yearly2 notif offset time must match");
   Test(true, yearly2.hasNotifs == Number(hasNotifs2), "yearly2 has notifs must match");
   Test(true, yearly2.dayOfYear == 2, "yearly2 day of year must match");
+}
+
+async function Test_GeneratedBasic() {
+  await ldb.clearAllTables();
+  await ldb.createRootFolder(0);
+
+  const startStamp1 = convertTimeAndDateToTimestamp("2001-01-01", "00:00");
+  const endStamp1 = convertTimeAndDateToTimestamp("2001-12-31", "23:59");
+  const timeOfDayMin1 = 10, eventDurationMin1 = 10, notifOffsetTimeMin1 = -1, hasNotifs1 = true;
+  const everyNDays1 = 2;
+  const daily1ID = await ldb.createDailyReminder(0n, 0, startStamp1, endStamp1, timeOfDayMin1, eventDurationMin1, notifOffsetTimeMin1, hasNotifs1, everyNDays1, "daily");
+  const dailies = await ldb.readGeneratedRemindersInRange(startStamp1, endStamp1);
+  Test(true, dailies.length == 183, "basic daily reminders test must have 183 results");
+  Test(true, CheckGeneratedBasic(dailies));
+
+  await ldb.clearAllTables();
+  await ldb.createRootFolder(0);
+
+  const startStamp2 = convertTimeAndDateToTimestamp("2001-01-01", "00:00");
+  const endStamp2 = convertTimeAndDateToTimestamp("2001-12-31", "23:59");
+  const everyNWeeks2 = 1, daysOfWeek2 = "0001000";
+  const weekly2ID = await ldb.createWeeklyReminder(0n, 0, startStamp2, endStamp2, timeOfDayMin1, eventDurationMin1, notifOffsetTimeMin1, hasNotifs1, everyNWeeks2, daysOfWeek2, "weekly");
+  const weeklies = await ldb.readGeneratedRemindersInRange(startStamp2, endStamp2);
+  Test(true, weeklies.length == 52, "basic weekly reminders test must have 52 results");
+  Test(true, CheckGeneratedBasic(weeklies));
+
+  await ldb.clearAllTables();
+  await ldb.createRootFolder(0);
+
+  const startStamp3 = convertTimeAndDateToTimestamp("2001-01-01", "00:00");
+  const endStamp3 = convertTimeAndDateToTimestamp("2001-12-31", "23:59");
+  const lastDayOfMonth3 = false, daysOfMonth3 = "0100000000000000000000000010000";
+  const monthly3ID = await ldb.createMonthlyReminder(0n, 0, startStamp3, endStamp3, timeOfDayMin1, eventDurationMin1, notifOffsetTimeMin1, hasNotifs1, lastDayOfMonth3, daysOfMonth3, "monthly");
+  const monthlies = await ldb.readGeneratedRemindersInRange(startStamp3, endStamp3);
+  Test(true, monthlies.length == 24, "basic monthly reminders test must have 24 results");
+  Test(true, CheckGeneratedBasic(monthlies));
+
+  await ldb.clearAllTables();
+  await ldb.createRootFolder(0);
+
+  const startStamp4 = convertTimeAndDateToTimestamp("2001-01-01", "00:00");
+  const endStamp4 = convertTimeAndDateToTimestamp("2001-12-31", "23:59");
+  const yearly4ID = await ldb.createYearlyReminder(0n, 0, startStamp4, endStamp4, timeOfDayMin1, eventDurationMin1, notifOffsetTimeMin1, hasNotifs1, startStamp4, "yearly");
+  const yearlies = await ldb.readGeneratedRemindersInRange(startStamp4, endStamp4);
+  Test(true, yearlies.length == 1, "basic yearly reminders test must have 1 result");
+  Test(true, CheckGeneratedBasic(yearlies));
+
+  function CheckGeneratedBasic(generated: GeneratedReminder[]) {
+    for (const reminder of generated) {
+      if (reminder.eventStartMin != timeOfDayMin1) { console.log("generated reminders must match the event start minute"); return false; }
+      if (reminder.eventEndMin != (timeOfDayMin1 + eventDurationMin1)) { console.log("generated reminders must match the event end minute"); return false; }
+      if (reminder.notifMin != (timeOfDayMin1 + notifOffsetTimeMin1)) { console.log("generated reminders must match the notification minute"); return false; }
+      if (!reminder.hasNotif) { console.log("generated reminders must match the has notification"); return false; }
+    }
+    return true;
+  }
 }

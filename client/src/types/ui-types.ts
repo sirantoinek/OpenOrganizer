@@ -2,7 +2,7 @@
 /*
  * Authors: Rachel Patella
  * Created: 2025-10-21
- * Updated: 2025-11-19
+ * Updated: 2025-11-20
  *
  * This file contains interfaces that extend the shared-types with UI-specific fields.
  *
@@ -48,7 +48,7 @@ export type UIReminder = Reminder & {
   extension: Record<string, string | number | null>;  // Essentially extension is a dictionary-like object with keys (ex. field names) and values  
   // useful for adding on custom event type fields/extensions that we may not know the types to yet
   // Reminder recurrence fields to fill out UI form
-  recurrence?: recurrenceReminder | null;
+  recurrence?: recurrenceReminder | null | undefined;
   // Used to determine which series table the recurring reminders itemID is from
   originalRecurrenceType?: string | null;
   isRecurring: boolean;
@@ -85,7 +85,7 @@ export type weeklyReminder = {
   eventDurationMin: number;
   notifOffsetTimeMin: number | null;
   everyNWeeks: number;
-  daysOfWeek: string;
+  daysOfWeek: number[];
   seriesEndDate: string;
 };
 

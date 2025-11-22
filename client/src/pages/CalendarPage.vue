@@ -1,7 +1,7 @@
 <!--
  * Authors: Rachel Patella, Maria Pasaylo, Michael Jagiello
  * Created: 2025-09-22
- * Updated: 2025-11-20
+ * Updated: 2025-11-21
  *
  * This file is the main home page that includes the calendar view, notes/reminders list, 
  * and a file explorer as a 3 column grid layout.
@@ -250,6 +250,11 @@
                         Series start: {{ eventDatetoLocaleString(item.date) }}<br>
                         Series end: {{eventDatetoLocaleString(item.recurrence.weekly.seriesEndDate)}}<br>
                       </template>
+
+                       <template v-else-if="item.isRecurring && item.recurrence?.monthly">
+                        Series start: {{ eventDatetoLocaleString(item.date) }}<br>
+                        Series end: {{eventDatetoLocaleString(item.recurrence.monthly.seriesEndDate)}}<br>
+                      </template>
                       
                       Last modified: {{ item.temporaryLastModified }}
                     </div>
@@ -400,6 +405,72 @@
                 />
                 <q-input
                   v-model="item.recurrence.weekly.seriesEndDate"
+                  label="Series End Date"
+                  type="date"
+                  :min="item.date"
+                  :max="endDateRangeRecurring(item.date)"
+                  outlined
+                  dense
+                  style="background-color: #f2f2f2; margin-bottom: 10px"
+                />
+                </div>
+                <div v-if="item.recurrence.type === 'monthly' && item.recurrence.monthly" style="margin-bottom:8px;">
+                  <q-input
+                  v-model.number="item.recurrence.monthly.timeOfDayMin"
+                  label="Event Time (in minutes into day)"
+                  :min="0"
+                  :max="1439"
+                  type="number"
+                  outlined
+                  dense
+                  style="background-color: #f2f2f2; margin-bottom: 10px"
+                />
+                <q-input
+                  v-model.number="item.recurrence.monthly.eventDurationMin"
+                  label="Event Duration (in minutes)"
+                  :min="0"
+                  type="number"
+                  outlined
+                  dense
+                  style="background-color: #f2f2f2; margin-bottom: 10px"
+                />
+                <q-checkbox
+                  v-model="item.recurrence.monthly.lastDayOfMonth"
+                  label="Notify on last day of the month"
+                  dense
+                  hide-bottom-space
+                  style="margin-bottom: 10px"
+                />
+                <!-- Example QDate with QInput component code from here: https://quasar.dev/vue-components/date#with-qinput-->
+                  <q-input 
+                  placeholder="Days of the month"
+                  readonly
+                  :model-value="selectedDayOfMonth"
+                  outlined
+                  dense
+                   style="background-color: #f2f2f2; margin-bottom: 10px"
+                  >
+                  <!-- Normalize the visible date picker to be a static month with 31 days -->
+                    <template v-slot:append>
+                      <q-icon name="event" class="cursor-pointer">
+                        <q-popup-proxy cover transition-show="scale" transition-hide="scale">
+                          <q-date v-model="DaysOfMonthSelection" 
+                          :key="String(item.itemID)"
+                          multiple 
+                          minimal
+                          class="monthly-day-picker"
+                          default-year-month="2024/12"
+                          style="width: 200px;">
+                            <div class="row items-center justify-end">
+                              <q-btn v-close-popup label="Close" color="primary" flat />
+                            </div>
+                          </q-date>
+                        </q-popup-proxy>
+                      </q-icon>
+                    </template>
+                  </q-input>
+                <q-input
+                  v-model="item.recurrence.monthly.seriesEndDate"
                   label="Series End Date"
                   type="date"
                   :min="item.date"
@@ -845,6 +916,32 @@ const settingsTab = ref('cloud');
 const reminders = ref<UIReminder[]>([])
 // Array of reminders by month for calendar
 const monthReminders = ref<UIReminder[]>([])
+// Stores the array of full dates selected in qdate component for monthly recurrence
+const DaysOfMonthSelection = ref<string[]>([]);  
+
+// Extract just the days from the full dates of the DaysOfMonthSelection
+// Use these days to set the daysOfMonth array in the MonthlyReminder recurrence 
+// Computed so that it updates automatically when DaysOfMonthSelection changes
+const selectedDayOfMonth = computed(() => {
+  // If daysOfMonthSelection is missing or empty, show empty string
+  if (!DaysOfMonthSelection.value || DaysOfMonthSelection.value.length === 0) {
+    return '';
+  }
+   const days = DaysOfMonthSelection.value.map(dateString => {
+    // Split each date string ex. "YYYY/MM/DD" in the array by '/' delimiter to get each part
+    const parts = dateString.split('/');
+
+    // Last part is the day component "DD"
+    const dayPart = parts[2] ?? '';
+
+    // Convert the day string "DD" to an integer to get rid of leading zeros like "01" for q-input display
+    return parseInt(dayPart, 10);
+    // Sort the days numerically in ascending order for q-input display
+  }).sort((a, b) => a - b); 
+
+  // Join back the stripped day numbers into a comma-separated string for q-input display
+  return days.join(', ');
+});
 
 // Helper function to determine days user can pick for event end day (from start day to one year later)
 // Hard limits reminders to +1 year from start date for event duration
@@ -1285,6 +1382,16 @@ else if (val === 'weekly' && !recurrence.weekly) {
     everyNWeeks: 1,
     seriesEndDate: '' 
   }}
+
+  else if (val === 'monthly' && !recurrence.monthly) {
+  recurrence.monthly = { 
+    timeOfDayMin: 0,
+    eventDurationMin: 0,
+    notifOffsetTimeMin: null,
+    lastDayOfMonth: false,
+    daysOfMonth: [], // all days false by default
+    seriesEndDate: '' 
+  }}
 }
 
 
@@ -1439,7 +1546,8 @@ function renameTreeNode() {
     if (folder) {
         // Show input box
         folder.isEditing = true;
-        // Set temporary name displayed in tree to written name
+        // Copy DB-saved name to temporary field to visually populate it for editing
+        // The actual editing is bound to the temporaryFolderName field
         folder.temporaryFolderName = folder.folderName;
         selectedFolderID.value = folder.folderID;
     }
@@ -1467,7 +1575,7 @@ function cancelRename(item: UIReminder | UINote | UIFolder) {
   if (!item) return;
 
   // Distinguish between folder and reminder/note by checking for unique property
-  // Rename a folder
+  // Cancel renaming a folder
   if ('temporaryFolderName' in item) {
     // Folder is a draft, remove from UI
     if (!item.isSaved) {
@@ -1476,21 +1584,23 @@ function cancelRename(item: UIReminder | UINote | UIFolder) {
       selectedFolderID.value = null;
       }
       else {
-        item.isEditing = false;
+      // Get rid of input box
+      item.isEditing = false;
+      // Revert temporary name back to original folder name from DB
       item.temporaryFolderName = item.folderName;
       item.folderNameError = '';
       }
       return;
     }
    
-  // Rename a reminder
+  // Cancel renaming a reminder
   else if ('temporaryEventStartTime' in item) {
     item.isEditing = false;
     item.temporaryTitle = item.title ?? '';
     item.titleMessageError = '';
     return;
   }
-  // Rename a note
+  // Cancel renaming a note
   else if ('temporaryText' in item) {
     item.isEditing = false;
     item.temporaryTitle = item.title ?? '';
@@ -1512,12 +1622,12 @@ function selectBreadcrumbItem(folderID : bigint) {
   selectedFolderID.value = folderID;
 }
 
-// temp id generator for UI-only drafts (negative IDs)
-// Negative ID for temp objects from: https://stackoverflow.com/questions/53850790/how-to-work-with-unsaved-entities-even-though-id-attribute-is-needed
+// Temp ID generator for UI-only drafts (negative IDs)
+// Negative ID for temp objects idea from: https://stackoverflow.com/questions/53850790/how-to-work-with-unsaved-entities-even-though-id-attribute-is-needed
 let tempIDCounter = -2n;
 // Function to add a reminder to the list on the specified calendar date
 function addReminder() {
-  // create a UI-only draft reminder with a temporary negative bigint ID
+  // Create a UI-only draft reminder with a temporary negative bigint ID
   const tempID = tempIDCounter--;
   // Folder to save reminder in is either root by default if nothing is selected, otherwise selected folder in tree
   const folderID = normalizeFolderID(selectedFolderID.value, notes.value, reminders.value, folders.value) ?? 0n;
@@ -1676,14 +1786,20 @@ async function loadRecurringSeries() {
   const startRange = convertTimeAndDateToTimestamp(`${startYear}-01-01`, '');
   const endRange = convertTimeAndDateToTimestamp(`${endYear}-12-31`, '23:59');
   try {
+    // Load daily reminders
     const rows = await readDailyRemindersInRange(startRange, endRange);
     for (const recurringDailyReminder of rows) {
       mapDBSeriesToUIRecurringReminder(recurringDailyReminder, 'daily', true);
     }
-     // weekly
+    // Load weekly reminders
     const weeklyRows = await readWeeklyRemindersInRange(startRange, endRange);
     for (const recurringWeeklyReminder of weeklyRows) {
       mapDBSeriesToUIRecurringReminder(recurringWeeklyReminder, 'weekly', true);
+    } 
+    // Load monthly reminders
+    const monthlyRows = await readMonthlyRemindersInRange(startRange, endRange);
+    for (const recurringMonthlyReminder of monthlyRows) {
+      mapDBSeriesToUIRecurringReminder(recurringMonthlyReminder, 'monthly', true);
     } 
   } catch (error) {
     console.error('Error loading recurring series:', error);
@@ -1989,11 +2105,38 @@ function mapDBSeriesToUIRecurringReminder(row: DailyReminder | WeeklyReminder | 
     };
   }
 
+  else if (recurrenceType === 'monthly') {
+    // If recurrence type is monthly, treat DB row as monthly reminder schema
+    const monthlyReminder = row as MonthlyReminder;
+
+     // Extract daysOfMonth array back from DB stored 31-char string to display in grid
+    const daysOfMonthArray: number[] = [];
+        // Fill empty array by iterating over each character in the string
+        // If the character at the index is '1', that day is selected, push its index
+        for (let i = 0; i < 31; i++) {
+          if (monthlyReminder.daysOfMonth.charAt(i) === '1') {
+            daysOfMonthArray.push(i + 1);
+          }
+        }
+    recurrence = {
+      type: 'monthly',
+      monthly: {
+        timeOfDayMin: monthlyReminder.seriesStartMin,
+        eventDurationMin: monthlyReminder.eventDurationMin,
+        notifOffsetTimeMin: UINotificationOffset,
+        // When DB value exists, convert to boolean 
+        lastDayOfMonth: Boolean(monthlyReminder.lastDayOfMonth),
+        daysOfMonth: daysOfMonthArray,
+        seriesEndDate: normalizeDatePickerToCalendar(endDateString) ?? endDateString
+      }
+    };
+  }
+
   // UI reminder extension fields as a record, these are the actual values taken from frontend input fields 
   const extensionsUI = {} as Record<string, string | number | null | undefined>;
 
   // DB reminder row with extensions
-  const extensionsArr = (row as DailyReminder | WeeklyReminder & { extensions?: Extension[] }).extensions;
+  const extensionsArr = (row as DailyReminder | WeeklyReminder | MonthlyReminder & { extensions?: Extension[] }).extensions;
 
   // If extensions array exists, map each extension into extensions UI record
   if (extensionsArr && extensionsArr.length > 0) {
@@ -2211,7 +2354,7 @@ onMounted(async () => {
 
 // Function to add a folder to the tree
 function addFolder() {
-   // create a UI-only draft folder with a temporary negative bigint ID
+   // Create a UI-only draft folder with a temporary negative bigint ID
   const tempID = tempIDCounter--;
   // Sets parentFolderID of new folder to currently selected folder in file explorer tree. If no folder is selected, add new folder to root (parentFolderID = 0)
   const newParentFolderID = normalizeFolderID(selectedFolderID.value, notes.value, reminders.value, folders.value) ?? 0n;
@@ -2253,7 +2396,7 @@ async function saveFolder(folder: UIFolder){
   const normalizeParentFolderID: bigint = normalizeFolderID(candidateParentID, notes.value, reminders.value, folders.value) ?? 0n;
 
   // Check that parentFolderID exists when creating a folder
-  // Check for a folder with the parent folder ID exists in the folders array (or 0 for root)
+  // Check for a folder where the parent folder ID exists in the folders array (or 0 for root)
   const parentFolderExists = candidateParentID === 0n || folders.value.some(folder => String(folder.folderID) === String(candidateParentID));
 
   if (!parentFolderExists) {
@@ -2378,6 +2521,9 @@ async function saveRecurringReminder(reminder: UIReminder) {
     return await saveDailyReminder(reminder, extensionsToSend);
   } else if (reminder.recurrence.type === 'weekly') {
     return await saveWeeklyReminder(reminder, extensionsToSend);
+  }
+  else if (reminder.recurrence.type === 'monthly') {
+    return await saveMonthlyReminder(reminder, extensionsToSend);
   }
   
   // If no matching type, return false
@@ -2510,6 +2656,151 @@ async function saveDailyReminder(reminder: UIReminder, extensionsToSend: Extensi
       // Remove old normal reminder from UI
       reminders.value = reminders.value.filter(r => String(r.itemID) !== String(reminder.itemID));
 
+      folders.value = mapDBToUIFolder(await readAllFolders());
+      await loadRemindersForCalendarDate(selectedDate.value);
+      await loadRemindersForMonth(selectedDate.value);
+      reminder.timeMessageError = '';
+      return true;
+    }
+  }
+}
+
+// Function to validate and save monthly recurring reminders
+async function saveMonthlyReminder(reminder: UIReminder, extensionsToSend: Extension[] | undefined): Promise<boolean> {
+  if (!reminder.recurrence?.monthly) {
+    reminder.timeMessageError = 'Monthly recurrence settings are missing.';
+    return false;
+  }
+
+  const startTime = normalizeDatePickerToCalendar(reminder.date) ?? reminder.date;
+  const endTime = normalizeDatePickerToCalendar(reminder.recurrence.monthly.seriesEndDate) ?? reminder.recurrence.monthly.seriesEndDate;
+  const seriesStartTime = convertTimeAndDateToTimestamp(startTime, '00:00');
+  const seriesEndTime = convertTimeAndDateToTimestamp(endTime, '23:59');
+
+  // Compare exact moment in time if series start time is before series end time, if not, error
+  const startEpoch = timeStamptoEpoch(seriesStartTime);
+  const endEpoch = timeStamptoEpoch(seriesEndTime);
+  if (endEpoch < startEpoch) {
+    reminder.timeMessageError = 'Start time must be before end time.';
+    return false;
+  }
+
+  // End day must be provided
+  if (!reminder.recurrence.monthly.seriesEndDate) {
+    reminder.timeMessageError = 'Please select a valid event end date for series.';
+    return false;
+  }
+
+  // timeOfDayMin must be between 0 and 1439 (start and end of day)
+  if (!Number.isInteger(reminder.recurrence.monthly.timeOfDayMin) || reminder.recurrence.monthly.timeOfDayMin < 0 || reminder.recurrence.monthly.timeOfDayMin > 1439) {
+    reminder.timeMessageError = 'Event time must be within the start and end of the day (0 to 1439).';
+    return false;
+  }
+
+  // Event duration must be positive (zero for instant event)
+  if (!Number.isInteger(reminder.recurrence.monthly.eventDurationMin) || reminder.recurrence.monthly.eventDurationMin < 0) {
+    reminder.timeMessageError = 'Event duration must be positive (0 for instant events).';
+    return false;
+  }
+
+  // Event duration cannot be more than a day
+  if (reminder.recurrence.monthly.eventDurationMin > 1440) {
+    reminder.timeMessageError = 'Event duration cannot be more than a day.';
+    return false;
+  }
+
+  // Extract numeric selected days from full date strings in DaysOfMonthSelection
+  const selectedDaysOfMonth: number[] = (DaysOfMonthSelection.value ?? []).map(dateString => {
+    const parts = dateString.split('/');
+    const dayPart = parts[2] ?? '';
+    return parseInt(dayPart, 10);
+  }).filter(dayNumber => Number.isInteger(dayNumber) && dayNumber >= 1 && dayNumber <= 31);
+
+
+  // Initialize 31-char string as a char array with all 0's (no selection)
+  // ['0', '0', '0', '0', '0', '0', '0'] where all days of the month are unselected by default
+  const daysOfMonthString = Array(31).fill('0');
+
+  // Loop through each selected day of the month
+  selectedDaysOfMonth.forEach((index) => {
+    // Ensure index is in range
+    if (index >= 0 && index <= 31) {
+      // For each selected day, set flag to 1
+      daysOfMonthString[index - 1] = '1';
+    }
+  });
+  // Join each character into a single string to store in database
+  const daysOfMonthDatabaseString = daysOfMonthString.join('');
+
+  // Make sure at least one day of the month is selected
+  if (selectedDaysOfMonth.length === 0) {
+    reminder.timeMessageError = 'Please select at least one day of the month for the event to occur.';
+    return false;
+  }
+
+  // Assign local variables for DB saving
+  const timeOfDayMin = reminder.recurrence.monthly.timeOfDayMin;
+  const eventDurationMin = reminder.recurrence.monthly.eventDurationMin;
+  const recurringNotifOffset = reminder.recurrence.monthly.notifOffsetTimeMin == null ? 0 : -Math.abs(reminder.recurrence.monthly.notifOffsetTimeMin);
+  const hasNotification = reminder.recurrence.monthly.notifOffsetTimeMin != null;
+  const lastDayOfMonth = reminder.recurrence.monthly.lastDayOfMonth;
+  const folderID: bigint = reminder.temporaryFolderID!;
+
+  // Recurring reminder not saved to DB yet, create it
+  if (!reminder.isSaved) {
+    const seriesID = await createMonthlyReminder(folderID, reminder.eventType, seriesStartTime, seriesEndTime, timeOfDayMin, eventDurationMin, recurringNotifOffset, hasNotification, lastDayOfMonth, daysOfMonthDatabaseString, reminder.temporaryTitle, extensionsToSend);
+
+    reminder.itemID = seriesID;
+    reminder.isSaved = true;
+
+    // Fetch the newly created recurring reminder from the DB
+    const row = await readMonthlyReminder(seriesID);
+
+    // Map recurring reminder to UI format
+    if (row) {
+      mapDBSeriesToUIRecurringReminder(row, 'monthly', true);
+    }
+
+    folders.value = mapDBToUIFolder(await readAllFolders());
+    reminder.timeMessageError = '';
+    return true;
+  } else {
+    // Recurring reminder saved before, update it
+    const originalRecurrenceType = reminder.originalRecurrenceType;
+
+    if (originalRecurrenceType) {
+      // Update existing series in DB
+      await updateMonthlyReminder(reminder.itemID, folderID, reminder.eventType, seriesStartTime, seriesEndTime, timeOfDayMin, eventDurationMin, recurringNotifOffset, hasNotification, lastDayOfMonth, daysOfMonthDatabaseString, reminder.temporaryTitle, extensionsToSend);
+
+      // Fetch the updated recurring reminder from the DB
+      const row = await readMonthlyReminder(reminder.itemID);
+
+      // Map recurring reminder to UI format
+      if (row) {
+        mapDBSeriesToUIRecurringReminder(row, 'monthly', true);
+      }
+
+      folders.value = mapDBToUIFolder(await readAllFolders());
+      reminder.timeMessageError = '';
+      return true;
+
+    } else {
+      // Original recurrence type is null, reminder is normal, convert it to a series
+      // Create new series reminder
+      const seriesID = await createMonthlyReminder(folderID, reminder.eventType, seriesStartTime, seriesEndTime, timeOfDayMin, eventDurationMin, recurringNotifOffset, hasNotification, lastDayOfMonth, daysOfMonthDatabaseString, reminder.temporaryTitle, extensionsToSend);
+
+      // Delete old normal reminder
+      await deleteItem(reminder.itemID, 12);
+
+      const row = await readMonthlyReminder(seriesID);
+
+      if (row) {
+        mapDBSeriesToUIRecurringReminder(row, 'monthly', true);
+      }
+
+      // Remove old normal reminder from UI list
+      reminders.value = reminders.value.filter(r => String(r.itemID) !== String(reminder.itemID));
+      // Map recurring reminder to UI format
       folders.value = mapDBToUIFolder(await readAllFolders());
       await loadRemindersForCalendarDate(selectedDate.value);
       await loadRemindersForMonth(selectedDate.value);
@@ -3133,6 +3424,11 @@ async function cancelReminder(reminder: UIReminder) {
         if (row) {
           mapDBSeriesToUIRecurringReminder(row, 'weekly', true)
         }
+      } else if (originalRecurrenceType === 'monthly') {
+        const row = await readMonthlyReminder(reminder.itemID);
+        if (row) {
+          mapDBSeriesToUIRecurringReminder(row, 'monthly', true)
+        }
       }
     } 
       // Normal reminder, read from its table and map to UI
@@ -3174,7 +3470,6 @@ watch(selectAll, (selectionVal) => {
     });
   }
 });
-
 
 // template and script source code from slot - day month example
 // https://qcalendar.netlify.app/developing/qcalendar-month

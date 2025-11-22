@@ -2,7 +2,7 @@
 /*
  * Authors: Rachel Patella
  * Created: 2025-10-21
- * Updated: 2025-11-20
+ * Updated: 2025-11-21
  *
  * This file contains interfaces that extend the shared-types with UI-specific fields.
  *
@@ -94,7 +94,7 @@ export type monthlyReminder = {
   eventDurationMin: number;
   notifOffsetTimeMin: number | null;
   lastDayOfMonth: boolean;
-  daysOfMonth: string;
+  daysOfMonth: number[];
   seriesEndDate: string;
 };
 

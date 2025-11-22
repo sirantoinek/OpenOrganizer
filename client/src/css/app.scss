@@ -3,7 +3,7 @@
 /* 
  * Authors: Rachel Patella, Maria Pasaylo
  * Created: 2025-04-13
- * Updated: 2025-11-10
+ * Updated: 2025-11-21
  *
  * This file is the CSS global stylesheet for the application
  *
@@ -242,4 +242,9 @@ overflow-wrap: break-word;
 .flight-half {
   background-color: #f2f2f2;
   margin-bottom: 5px;
+}
+
+// Hide year/month navigation in the day picker so only days 1-31 are shown
+.monthly-day-picker .q-date__navigation {
+  display: none !important;
 }

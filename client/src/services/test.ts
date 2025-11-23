@@ -1,7 +1,7 @@
 /*
  * Authors: Michael Jagiello
  * Created: 2025-11-04
- * Updated: 2025-11-19
+ * Updated: 2025-11-23
  *
  * This file defines the entry testing suite function and the function used to test the Renderer.
  *
@@ -33,6 +33,7 @@ async function TestingSuiteRenderer() {
   await Test_Monthly();
   await Test_Yearly();
   await Test_GeneratedBasic();
+  await Test_Folders();
 
   await ldb.clearAllTables();
   await ldb.createRootFolder(0);
@@ -355,7 +356,8 @@ async function Test_Daily() {
   const endStamp2 = convertTimeAndDateToTimestamp("2004-12-30", "22:59");
   const timeOfDayMin2 = 600, eventDurationMin2 = 1, notifOffsetTimeMin2 = -10, hasNotifs2 = false;
   const everyNDays2 = 1;
-  const daily2ID = await ldb.createDailyReminder(0n, 0, startStamp2, endStamp2, timeOfDayMin2, eventDurationMin2, notifOffsetTimeMin2, hasNotifs2, everyNDays2, "daily2");
+  const extensions2 = eventtypes.FlightToExtensions(eventtypes.FieldsToFlight());
+  const daily2ID = await ldb.createDailyReminder(0n, 0, startStamp2, endStamp2, timeOfDayMin2, eventDurationMin2, notifOffsetTimeMin2, hasNotifs2, everyNDays2, "daily2", extensions2);
   const daily2 = await ldb.readDailyReminder(daily2ID);
   Test(true, daily2.seriesStartYear == 2004 && daily2.seriesStartDay == 2 && daily2.seriesStartMin == 60, "daily2 series start time must match");
   Test(true, daily2.seriesEndYear == 2004 && daily2.seriesEndDay == 365 && daily2.seriesEndMin == 1379, "daily2 series end time must match");
@@ -364,6 +366,9 @@ async function Test_Daily() {
   Test(true, daily2.notifOffsetTimeMin == notifOffsetTimeMin2, "daily2 notif offset time must match");
   Test(true, daily2.hasNotifs == Number(hasNotifs2), "daily2 has notifs must match");
   Test(true, daily2.everyNDays == everyNDays2, "daily2 every n days must match");
+  for (let i = 0; i < extensions2.length; i++) {
+    Test(true, daily2.extensions![i]!.data == extensions2[i]!.data, "daily2 extensions should match");
+  }
 }
 
 async function Test_Weekly() {
@@ -390,7 +395,8 @@ async function Test_Weekly() {
   const endStamp2 = convertTimeAndDateToTimestamp("2004-12-30", "22:59");
   const timeOfDayMin2 = 600, eventDurationMin2 = 1, notifOffsetTimeMin2 = -10, hasNotifs2 = false;
   const everyNWeeks2 = 1, daysOfWeek2 = "0001000";
-  const weekly2ID = await ldb.createWeeklyReminder(0n, 0, startStamp2, endStamp2, timeOfDayMin2, eventDurationMin2, notifOffsetTimeMin2, hasNotifs2, everyNWeeks2, daysOfWeek2, "weekly2");
+  const extensions2 = eventtypes.HotelToExtensions(eventtypes.FieldsToHotel());
+  const weekly2ID = await ldb.createWeeklyReminder(0n, 0, startStamp2, endStamp2, timeOfDayMin2, eventDurationMin2, notifOffsetTimeMin2, hasNotifs2, everyNWeeks2, daysOfWeek2, "weekly2", extensions2);
   const weekly2 = await ldb.readWeeklyReminder(weekly2ID);
   Test(true, weekly2.seriesStartYear == 2004 && weekly2.seriesStartDay == 2 && weekly2.seriesStartMin == 60, "weekly2 series start time must match");
   Test(true, weekly2.seriesEndYear == 2004 && weekly2.seriesEndDay == 365 && weekly2.seriesEndMin == 1379, "weekly2 series end time must match");
@@ -400,6 +406,9 @@ async function Test_Weekly() {
   Test(true, weekly2.hasNotifs == Number(hasNotifs2), "weekly2 has notifs must match");
   Test(true, weekly2.everyNWeeks == everyNWeeks2, "weekly2 every n weeks must match");
   Test(true, weekly2.daysOfWeek == daysOfWeek2, "weekly2 days of week must match");
+  for (let i = 0; i < extensions2.length; i++) {
+    Test(true, weekly2.extensions![i]!.data == extensions2[i]!.data, "weekly2 extensions should match");
+  }
 }
 
 async function Test_Monthly() {
@@ -426,7 +435,8 @@ async function Test_Monthly() {
   const endStamp2 = convertTimeAndDateToTimestamp("2004-12-30", "22:59");
   const timeOfDayMin2 = 600, eventDurationMin2 = 1, notifOffsetTimeMin2 = -10, hasNotifs2 = false;
   const lastDayOfMonth2 = false, daysOfMonth2 = "0000000000000000000000000001111";
-  const monthly2ID = await ldb.createMonthlyReminder(0n, 0, startStamp2, endStamp2, timeOfDayMin2, eventDurationMin2, notifOffsetTimeMin2, hasNotifs2, lastDayOfMonth2, daysOfMonth2, "monthly2");
+  const extensions2 = eventtypes.FlightToExtensions(eventtypes.FieldsToFlight("flight name"));
+  const monthly2ID = await ldb.createMonthlyReminder(0n, 0, startStamp2, endStamp2, timeOfDayMin2, eventDurationMin2, notifOffsetTimeMin2, hasNotifs2, lastDayOfMonth2, daysOfMonth2, "monthly2", extensions2);
   const monthly2 = await ldb.readMonthlyReminder(monthly2ID);
   Test(true, monthly2.seriesStartYear == 2004 && monthly2.seriesStartDay == 2 && monthly2.seriesStartMin == 60, "monthly2 series start time must match");
   Test(true, monthly2.seriesEndYear == 2004 && monthly2.seriesEndDay == 365 && monthly2.seriesEndMin == 1379, "monthly2 series end time must match");
@@ -436,6 +446,9 @@ async function Test_Monthly() {
   Test(true, monthly2.hasNotifs == Number(hasNotifs2), "monthly2 has notifs must match");
   Test(true, monthly2.lastDayOfMonth == Number(lastDayOfMonth2), "monthly2 last day of month must match");
   Test(true, monthly2.daysOfMonth == daysOfMonth2, "monthly2 days of month must match");
+  for (let i = 0; i < extensions2.length; i++) {
+    Test(true, monthly2.extensions![i]!.data == extensions2[i]!.data, "monthly2 extensions should match");
+  }
 }
 
 async function Test_Yearly() {
@@ -459,7 +472,8 @@ async function Test_Yearly() {
   const startStamp2 = convertTimeAndDateToTimestamp("2004-01-02", "01:00");
   const endStamp2 = convertTimeAndDateToTimestamp("2004-12-30", "22:59");
   const timeOfDayMin2 = 600, eventDurationMin2 = 1, notifOffsetTimeMin2 = -10, hasNotifs2 = false;
-  const yearly2ID = await ldb.createYearlyReminder(0n, 0, startStamp2, endStamp2, timeOfDayMin2, eventDurationMin2, notifOffsetTimeMin2, hasNotifs2, startStamp2, "yearly2");
+  const extensions2 = eventtypes.HotelToExtensions(eventtypes.FieldsToHotel("hotel name"));
+  const yearly2ID = await ldb.createYearlyReminder(0n, 0, startStamp2, endStamp2, timeOfDayMin2, eventDurationMin2, notifOffsetTimeMin2, hasNotifs2, startStamp2, "yearly2", extensions2);
   const yearly2 = await ldb.readYearlyReminder(yearly2ID);
   Test(true, yearly2.seriesStartYear == 2004 && yearly2.seriesStartDay == 2 && yearly2.seriesStartMin == 60, "yearly2 series start time must match");
   Test(true, yearly2.seriesEndYear == 2004 && yearly2.seriesEndDay == 365 && yearly2.seriesEndMin == 1379, "yearly2 series end time must match");
@@ -468,6 +482,9 @@ async function Test_Yearly() {
   Test(true, yearly2.notifOffsetTimeMin == notifOffsetTimeMin2, "yearly2 notif offset time must match");
   Test(true, yearly2.hasNotifs == Number(hasNotifs2), "yearly2 has notifs must match");
   Test(true, yearly2.dayOfYear == 2, "yearly2 day of year must match");
+  for (let i = 0; i < extensions2.length; i++) {
+    Test(true, yearly2.extensions![i]!.data == extensions2[i]!.data, "yearly2 extensions should match");
+  }
 }
 
 async function Test_GeneratedBasic() {
@@ -524,4 +541,19 @@ async function Test_GeneratedBasic() {
     }
     return true;
   }
+}
+
+async function Test_Folders() {
+  await ldb.clearAllTables();
+
+  await ldb.createRootFolder(0);
+  const folder1 = await ldb.createFolder(0n, 0, "name1");
+  const folder2 = await ldb.createFolder(0n, 0xFFFFFF, "name2");
+  const folder3 = await ldb.createFolder(folder1, 0x0F0F0F, "name3");
+  const folder4 = await ldb.createFolder(folder3, 0xF0F0F0, "name4");
+  const folders = await ldb.readAllFolders();
+  Test(true, folders[1]!.parentFolderID == 0n && folders[1]!.colorCode == 0 && folders[1]!.folderName == "name1", "folder1 must match");
+  Test(true, folders[2]!.parentFolderID == 0n && folders[2]!.colorCode == 0xFFFFFF && folders[2]!.folderName == "name2", "folder2 must match");
+  Test(true, folders[3]!.parentFolderID == folder1 && folders[3]!.colorCode == 0x0F0F0F && folders[3]!.folderName == "name3", "folder3 must match");
+  Test(true, folders[4]!.parentFolderID == folder3 && folders[4]!.colorCode == 0xF0F0F0 && folders[4]!.folderName == "name4", "folder4 must match");
 }

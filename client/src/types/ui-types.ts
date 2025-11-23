@@ -2,7 +2,7 @@
 /*
  * Authors: Rachel Patella
  * Created: 2025-10-21
- * Updated: 2025-11-21
+ * Updated: 2025-11-23
  *
  * This file contains interfaces that extend the shared-types with UI-specific fields.
  *
@@ -102,7 +102,7 @@ export type yearlyReminder = {
   timeOfDayMin: number;
   eventDurationMin: number;
   notifOffsetTimeMin: number | null;
-  dayOfYear: number;
+  dayOfYear: string;
   seriesEndDate: string;
 };
 

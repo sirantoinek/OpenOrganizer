@@ -1,7 +1,7 @@
 <!--
  * Authors: Rachel Patella, Maria Pasaylo, Michael Jagiello
  * Created: 2025-09-22
- * Updated: 2025-11-21
+ * Updated: 2025-11-23
  *
  * This file is the main home page that includes the calendar view, notes/reminders list, 
  * and a file explorer as a 3 column grid layout.
@@ -251,9 +251,14 @@
                         Series end: {{eventDatetoLocaleString(item.recurrence.weekly.seriesEndDate)}}<br>
                       </template>
 
-                       <template v-else-if="item.isRecurring && item.recurrence?.monthly">
+                      <template v-else-if="item.isRecurring && item.recurrence?.monthly">
                         Series start: {{ eventDatetoLocaleString(item.date) }}<br>
                         Series end: {{eventDatetoLocaleString(item.recurrence.monthly.seriesEndDate)}}<br>
+                      </template>
+
+                       <template v-else-if="item.isRecurring && item.recurrence?.yearly">
+                        Series start: {{ eventDatetoLocaleString(item.date) }}<br>
+                        Series end: {{eventDatetoLocaleString(item.recurrence.yearly.seriesEndDate)}}<br>
                       </template>
                       
                       Last modified: {{ item.temporaryLastModified }}
@@ -449,7 +454,7 @@
                   outlined
                   dense
                    style="background-color: #f2f2f2; margin-bottom: 10px"
-                  >
+                  > 
                   <!-- Normalize the visible date picker to be a static month with 31 days -->
                     <template v-slot:append>
                       <q-icon name="event" class="cursor-pointer">
@@ -480,7 +485,46 @@
                   style="background-color: #f2f2f2; margin-bottom: 10px"
                 />
                 </div>
+                <div v-if="item.recurrence.type === 'yearly' && item.recurrence.yearly" style="margin-bottom:8px;">
+                  <q-input
+                  v-model.number="item.recurrence.yearly.timeOfDayMin"
+                  label="Event Time (in minutes into day)"
+                  :min="0"
+                  :max="1439"
+                  type="number"
+                  outlined
+                  dense
+                  style="background-color: #f2f2f2; margin-bottom: 10px"
+                />
+                <q-input
+                  v-model.number="item.recurrence.yearly.eventDurationMin"
+                  label="Event Duration (in minutes)"
+                  :min="0"
+                  type="number"
+                  outlined
+                  dense
+                  style="background-color: #f2f2f2; margin-bottom: 10px"
+                />
+                <q-input
+                  v-model="item.recurrence.yearly.dayOfYear"
+                  label="Recurrence Date"
+                  type="date"
+                  outlined
+                  dense
+                  style="background-color: #f2f2f2; margin-bottom: 10px"
+                  />
+                 <q-input
+                  v-model="item.recurrence.yearly.seriesEndDate"
+                  label="Series End Date"
+                  type="date"
+                  :min="item.date"
+                  :max="endDateRangeRecurring(item.date)"
+                  outlined
+                  dense
+                  style="background-color: #f2f2f2; margin-bottom: 10px"
+                />
               </div>
+            </div>
               <!-- Hide generic reminders temporary event start and end time for event types -->
               <template v-if="item.eventType !== 1 && item.eventType !== 2 && !item.isRecurring">
               <q-input
@@ -892,7 +936,7 @@
 </template>
 
 <script setup lang="ts">
-import {QCalendarMonth, addToDate, parseTimestamp, today, type Timestamp} from '@quasar/quasar-ui-qcalendar';
+import {QCalendarMonth, addToDate, parseTimestamp, today, isLeapYear, type Timestamp} from '@quasar/quasar-ui-qcalendar';
 import '@quasar/quasar-ui-qcalendar/index.css';
 import {buildCalendarEvents, groupEventsByDate, getEventTypeColor, getEventTypeFields, getEventStartLabel, getEventEndLabel, type EventType, type CalendarEvent} from '../frontend-utils/events';
 import { buildBreadcrumbs, normalizeFolderID, buildRootNodes} from '../frontend-utils/tree';
@@ -1353,13 +1397,14 @@ function onRecurrenceTypeChange(reminder: UIReminder, val: string) {
 
    // Ensure recurrence object exists
   if (!reminder.recurrence) {
+    // If it doesn't exist yet, create it with the type that is set
     reminder.recurrence = { type: val } as UIReminder['recurrence'];
   }
 
-  // Recurrence exists (not null)
+  // Otherwise, recurrence exists (set to not null for typescript)
   const recurrence = reminder.recurrence!;
 
-   // Update the type
+   // Update the type of the recurrence to the dropdown choice
   recurrence.type = val;
 
   // Create matching recurrence object with defaults (daily, weekly, monthly or yearly) according to the selected type if it doesn't exist yet
@@ -1390,6 +1435,15 @@ else if (val === 'weekly' && !recurrence.weekly) {
     notifOffsetTimeMin: null,
     lastDayOfMonth: false,
     daysOfMonth: [], // all days false by default
+    seriesEndDate: '' 
+  }}
+
+  else if (val === 'yearly' && !recurrence.yearly) {
+  recurrence.yearly = { 
+    timeOfDayMin: 0,
+    eventDurationMin: 0,
+    notifOffsetTimeMin: null,
+    dayOfYear: '',
     seriesEndDate: '' 
   }}
 }
@@ -1801,6 +1855,11 @@ async function loadRecurringSeries() {
     for (const recurringMonthlyReminder of monthlyRows) {
       mapDBSeriesToUIRecurringReminder(recurringMonthlyReminder, 'monthly', true);
     } 
+    // Load yearly reminders
+    const yearlyRows = await readYearlyRemindersInRange(startRange, endRange);
+    for (const recurringYearlyReminder of yearlyRows) {
+      mapDBSeriesToUIRecurringReminder(recurringYearlyReminder, 'yearly', true);
+    }
   } catch (error) {
     console.error('Error loading recurring series:', error);
   }
@@ -2069,7 +2128,7 @@ function mapDBSeriesToUIRecurringReminder(row: DailyReminder | WeeklyReminder | 
     recurrence = {
       type: 'daily',
       daily: {
-        timeOfDayMin: dailyReminder.seriesStartMin,
+        timeOfDayMin: dailyReminder.timeOfDayMin,
         eventDurationMin: dailyReminder.eventDurationMin,
         notifOffsetTimeMin: UINotificationOffset,
         everyNDays: dailyReminder.everyNDays,
@@ -2095,7 +2154,7 @@ function mapDBSeriesToUIRecurringReminder(row: DailyReminder | WeeklyReminder | 
     recurrence = {
       type: 'weekly',
       weekly: {
-        timeOfDayMin: weeklyReminder.seriesStartMin,
+        timeOfDayMin: weeklyReminder.timeOfDayMin,
         eventDurationMin: weeklyReminder.eventDurationMin,
         notifOffsetTimeMin: UINotificationOffset,
         everyNWeeks: weeklyReminder.everyNWeeks,
@@ -2121,7 +2180,7 @@ function mapDBSeriesToUIRecurringReminder(row: DailyReminder | WeeklyReminder | 
     recurrence = {
       type: 'monthly',
       monthly: {
-        timeOfDayMin: monthlyReminder.seriesStartMin,
+        timeOfDayMin: monthlyReminder.timeOfDayMin,
         eventDurationMin: monthlyReminder.eventDurationMin,
         notifOffsetTimeMin: UINotificationOffset,
         // When DB value exists, convert to boolean 
@@ -2132,11 +2191,44 @@ function mapDBSeriesToUIRecurringReminder(row: DailyReminder | WeeklyReminder | 
     };
   }
 
+   else if (recurrenceType === 'yearly') {
+    // If recurrence type is yearly, treat DB row as yearly reminder schema
+    const yearlyReminder = row as YearlyReminder;
+    const recurDay = Number(yearlyReminder.dayOfYear);
+    const recurYear = Number(yearlyReminder.seriesStartYear);
+    
+    // Convert dayOfYear from database back to full date string for display
+    // Backend only returns dayOfYear, which does not include the original year the user chose, only day and month
+    // Therefore, use series start year as the display year
+
+    // Make new date on Jan 1st in series start year
+    let recurDate = new Date(recurYear, 0, 1);
+    // Add dayOfYear days to get the correct month/day the user chose
+    recurDate.setDate(recurDate.getDate() + (recurDay - 1));
+    // If dayOfYear is Feb 29 on a leap year, but the series start year isnt a leap year, fallback display date to Feb 28 to not display invalid date
+    if (recurDay == 366 && !isLeapYear(recurYear)) {
+      recurDate = new Date(recurYear, 1, 28);
+    }
+    // Convert date to YYYY-MM-DD string format compatible with qcalendar/selectedDate
+    const recurDateString = `${recurDate.getFullYear()}-${String(recurDate.getMonth() + 1).padStart(2, '0')}-${String(recurDate.getDate()).padStart(2, '0')}`;
+    
+    recurrence = {
+      type: 'yearly',
+      yearly: {
+        timeOfDayMin: yearlyReminder.timeOfDayMin,
+        eventDurationMin: yearlyReminder.eventDurationMin,
+        notifOffsetTimeMin: UINotificationOffset,
+        dayOfYear: normalizeDatePickerToCalendar(recurDateString),
+        seriesEndDate: normalizeDatePickerToCalendar(endDateString) ?? endDateString
+      }
+    };
+  }
+
   // UI reminder extension fields as a record, these are the actual values taken from frontend input fields 
   const extensionsUI = {} as Record<string, string | number | null | undefined>;
 
   // DB reminder row with extensions
-  const extensionsArr = (row as DailyReminder | WeeklyReminder | MonthlyReminder & { extensions?: Extension[] }).extensions;
+  const extensionsArr = (row as DailyReminder | WeeklyReminder | MonthlyReminder | YearlyReminder & { extensions?: Extension[] }).extensions;
 
   // If extensions array exists, map each extension into extensions UI record
   if (extensionsArr && extensionsArr.length > 0) {
@@ -2525,6 +2617,10 @@ async function saveRecurringReminder(reminder: UIReminder) {
   else if (reminder.recurrence.type === 'monthly') {
     return await saveMonthlyReminder(reminder, extensionsToSend);
   }
+   else if (reminder.recurrence.type === 'yearly') {
+    return await saveYearlyReminder(reminder, extensionsToSend);
+  }
+  
   
   // If no matching type, return false
   return false;
@@ -2651,6 +2747,154 @@ async function saveDailyReminder(reminder: UIReminder, extensionsToSend: Extensi
       // Map recurring reminder to UI format
       if (row) {
         mapDBSeriesToUIRecurringReminder(row, 'daily', true);
+      }
+
+      // Remove old normal reminder from UI
+      reminders.value = reminders.value.filter(r => String(r.itemID) !== String(reminder.itemID));
+
+      folders.value = mapDBToUIFolder(await readAllFolders());
+      await loadRemindersForCalendarDate(selectedDate.value);
+      await loadRemindersForMonth(selectedDate.value);
+      reminder.timeMessageError = '';
+      return true;
+    }
+  }
+}
+
+// Function to validate and save weekly recurring reminders
+async function saveWeeklyReminder(reminder: UIReminder, extensionsToSend: Extension[] | undefined): Promise<boolean> {
+  if (!reminder.recurrence?.weekly) {
+    reminder.timeMessageError = 'Weekly recurrence settings are missing.';
+    return false;
+  }
+
+  // Set series times (local to this function)
+  const startTime = normalizeDatePickerToCalendar(reminder.date) ?? reminder.date;
+  const endTime = normalizeDatePickerToCalendar(reminder.recurrence.weekly.seriesEndDate) ?? reminder.recurrence.weekly.seriesEndDate;
+  const seriesStartTime = convertTimeAndDateToTimestamp(startTime, '00:00');
+  const seriesEndTime = convertTimeAndDateToTimestamp(endTime, '23:59');
+
+  // Compare exact moment in time if series start time is before series end time, if not, error
+  const startEpoch = timeStamptoEpoch(seriesStartTime);
+  const endEpoch = timeStamptoEpoch(seriesEndTime);
+  if (endEpoch < startEpoch) {
+    reminder.timeMessageError = 'Start time must be before end time.';
+    return false;
+  }
+
+  // End day must be provided
+  if (!reminder.recurrence.weekly.seriesEndDate) {
+    reminder.timeMessageError = 'Please select a valid event end date for series.';
+    return false;
+  }
+
+  // timeOfDayMin must be between 0 and 1439 (start and end of day)
+  if (!Number.isInteger(reminder.recurrence.weekly.timeOfDayMin) || reminder.recurrence.weekly.timeOfDayMin < 0 || reminder.recurrence.weekly.timeOfDayMin > 1439) {
+    reminder.timeMessageError = 'Event time must be within the start and end of the day (0 to 1439).';
+    return false;
+  }
+
+  // Event duration must be positive (zero for instant event)
+  if (!Number.isInteger(reminder.recurrence.weekly.eventDurationMin) || reminder.recurrence.weekly.eventDurationMin < 0) {
+    reminder.timeMessageError = 'Event duration must be positive (0 for instant events).';
+    return false;
+  }
+
+  // Event duration cannot be more than a day
+  if (reminder.recurrence.weekly.eventDurationMin > 1440) {
+    reminder.timeMessageError = 'Event duration cannot be more than a day.';
+    return false;
+  }
+
+  // everyNWeeks must not be less than 1
+  if (!Number.isInteger(reminder.recurrence.weekly.everyNWeeks) || reminder.recurrence.weekly.everyNWeeks < 1) {
+    reminder.timeMessageError = 'Recurrence interval must be greater than 1.';
+    return false;
+  }
+
+  // Convert day of weeks array into backend 7-char string for database storage
+  // Flag '1' for event that day (selected) and '0' for no event that day (not selected)
+  // Days of week array is set from the q-select dropdown menu containing each days index (ex. [0, 2] where 0 = Sunday, 2 = Tuesday were chosen)
+
+  // Initialize 7-char string as a char array with all 0's (no selection)
+  // ['0', '0', '0', '0', '0', '0', '0'] where all days are unselected by default
+  const daysOfWeekString = Array(7).fill('0');
+
+  // Loop through each selected day of the weeks indices
+  reminder.recurrence.weekly.daysOfWeek.forEach((index) => {
+    // Ensure index is in range
+    if (index >= 0 && index < 7) {
+      // For each selected day, set flag to 1
+      daysOfWeekString[index] = '1';
+    }
+  });
+  // Join char array into a single string to store in database
+  const daysOfWeekDatabaseString = daysOfWeekString.join('');
+
+  // Make sure at least one weekday is selected
+  if (reminder.recurrence.weekly.daysOfWeek.length === 0) {
+    reminder.timeMessageError = 'Please select at least one day of the week for the event to occur.';
+    return false;
+  }
+
+  // Assign variables for DB saving
+  const timeOfDayMin = reminder.recurrence.weekly.timeOfDayMin;
+  const eventDurationMin = reminder.recurrence.weekly.eventDurationMin;
+  // Notification is set as long as its not 'never' (null)
+  const recurringNotifOffset = reminder.recurrence.weekly.notifOffsetTimeMin == null ? 0 : -Math.abs(reminder.recurrence.weekly.notifOffsetTimeMin);
+  const hasNotification = reminder.recurrence.weekly.notifOffsetTimeMin != null;
+  const everyNWeeks = reminder.recurrence.weekly.everyNWeeks;
+  // folderID already checked in saveRecurringReminder, cast to non-null bigint folder ID to save
+  const folderID: bigint = reminder.temporaryFolderID!;
+
+
+  // Recurring reminder not saved to DB yet, create it
+  if (!reminder.isSaved) {
+    const seriesID = await createWeeklyReminder(folderID, reminder.eventType, seriesStartTime, seriesEndTime, timeOfDayMin, eventDurationMin, recurringNotifOffset, hasNotification, everyNWeeks, daysOfWeekDatabaseString, reminder.temporaryTitle, extensionsToSend);
+    // Make sure draft ID matches DB ID so it gets replaced in UI
+    reminder.itemID = seriesID;
+    reminder.isSaved = true;
+
+    // Fetch the newly created recurring reminder from the DB
+    const row = await readWeeklyReminder(seriesID);
+
+    // Map recurring reminder to UI format
+    if (row) {
+      mapDBSeriesToUIRecurringReminder(row, 'weekly', true);
+    }
+
+    // Load folders after creation
+    folders.value = mapDBToUIFolder(await readAllFolders());
+    reminder.timeMessageError = '';
+    return true;
+  } else {
+    // Recurring reminder saved before, update it
+    const originalRecurrenceType = reminder.originalRecurrenceType;
+    // Original recurrence type exists, so update existing recurring reminder
+    if (originalRecurrenceType) {
+      await updateWeeklyReminder(reminder.itemID, folderID, reminder.eventType, seriesStartTime, seriesEndTime, timeOfDayMin, eventDurationMin, recurringNotifOffset, hasNotification, everyNWeeks, daysOfWeekDatabaseString, reminder.temporaryTitle, extensionsToSend);
+
+      // Fetch the updated recurring reminder from the DB
+      const row = await readWeeklyReminder(reminder.itemID);
+
+      // Map recurring reminder to UI format
+      if (row) {
+        mapDBSeriesToUIRecurringReminder(row, 'weekly', true);
+      }
+
+      folders.value = mapDBToUIFolder(await readAllFolders());
+      reminder.timeMessageError = '';
+      return true;
+    } else {
+      // Original recurrence type is null, reminder is normal, convert it to a series
+      // Create new series reminder
+      const seriesID = await createWeeklyReminder(folderID, reminder.eventType, seriesStartTime, seriesEndTime, timeOfDayMin, eventDurationMin, recurringNotifOffset, hasNotification, everyNWeeks, daysOfWeekDatabaseString, reminder.temporaryTitle, extensionsToSend);
+      // Delete old normal reminder
+      await deleteItem(reminder.itemID, 12);
+      const row = await readWeeklyReminder(seriesID);
+      // Map recurring reminder to UI format
+      if (row) {
+        mapDBSeriesToUIRecurringReminder(row, 'weekly', true);
       }
 
       // Remove old normal reminder from UI
@@ -2810,16 +3054,15 @@ async function saveMonthlyReminder(reminder: UIReminder, extensionsToSend: Exten
   }
 }
 
-// Function to validate and save weekly recurring reminders
-async function saveWeeklyReminder(reminder: UIReminder, extensionsToSend: Extension[] | undefined): Promise<boolean> {
-  if (!reminder.recurrence?.weekly) {
-    reminder.timeMessageError = 'Weekly recurrence settings are missing.';
+// Function to validate and save yearly recurring reminders
+async function saveYearlyReminder(reminder: UIReminder, extensionsToSend: Extension[] | undefined): Promise<boolean> {
+  if (!reminder.recurrence?.yearly) {
+    reminder.timeMessageError = 'Yearly recurrence settings are missing.';
     return false;
   }
 
-  // Set series times (local to this function)
   const startTime = normalizeDatePickerToCalendar(reminder.date) ?? reminder.date;
-  const endTime = normalizeDatePickerToCalendar(reminder.recurrence.weekly.seriesEndDate) ?? reminder.recurrence.weekly.seriesEndDate;
+  const endTime = normalizeDatePickerToCalendar(reminder.recurrence.yearly.seriesEndDate) ?? reminder.recurrence.yearly.seriesEndDate;
   const seriesStartTime = convertTimeAndDateToTimestamp(startTime, '00:00');
   const seriesEndTime = convertTimeAndDateToTimestamp(endTime, '23:59');
 
@@ -2832,103 +3075,79 @@ async function saveWeeklyReminder(reminder: UIReminder, extensionsToSend: Extens
   }
 
   // End day must be provided
-  if (!reminder.recurrence.weekly.seriesEndDate) {
+  if (!reminder.recurrence.yearly.seriesEndDate) {
     reminder.timeMessageError = 'Please select a valid event end date for series.';
     return false;
   }
 
   // timeOfDayMin must be between 0 and 1439 (start and end of day)
-  if (!Number.isInteger(reminder.recurrence.weekly.timeOfDayMin) || reminder.recurrence.weekly.timeOfDayMin < 0 || reminder.recurrence.weekly.timeOfDayMin > 1439) {
+  if (!Number.isInteger(reminder.recurrence.yearly.timeOfDayMin) || reminder.recurrence.yearly.timeOfDayMin < 0 || reminder.recurrence.yearly.timeOfDayMin > 1439) {
     reminder.timeMessageError = 'Event time must be within the start and end of the day (0 to 1439).';
     return false;
   }
 
   // Event duration must be positive (zero for instant event)
-  if (!Number.isInteger(reminder.recurrence.weekly.eventDurationMin) || reminder.recurrence.weekly.eventDurationMin < 0) {
+  if (!Number.isInteger(reminder.recurrence.yearly.eventDurationMin) || reminder.recurrence.yearly.eventDurationMin < 0) {
     reminder.timeMessageError = 'Event duration must be positive (0 for instant events).';
     return false;
   }
 
   // Event duration cannot be more than a day
-  if (reminder.recurrence.weekly.eventDurationMin > 1440) {
+  if (reminder.recurrence.yearly.eventDurationMin > 1440) {
     reminder.timeMessageError = 'Event duration cannot be more than a day.';
     return false;
   }
+  
+  const recurDate = normalizeDatePickerToCalendar(reminder.recurrence.yearly.dayOfYear).trim();
 
-  // everyNWeeks must not be less than 1
-  if (!Number.isInteger(reminder.recurrence.weekly.everyNWeeks) || reminder.recurrence.weekly.everyNWeeks < 1) {
-    reminder.timeMessageError = 'Recurrence interval must be greater than 1.';
+  if (!recurDate) {
+    reminder.timeMessageError = 'Please select a date for the yearly recurrence.';
     return false;
   }
 
-  // Convert day of weeks array into backend 7-char string for database storage
-  // Flag '1' for event that day (selected) and '0' for no event that day (not selected)
-  // Days of week array is set from the q-select dropdown menu containing each days index (ex. [0, 2] where 0 = Sunday, 2 = Tuesday were chosen)
-
-  // Initialize 7-char string as a char array with all 0's (no selection)
-  // ['0', '0', '0', '0', '0', '0', '0'] where all days are unselected by default
-  const daysOfWeekString = Array(7).fill('0');
-
-  // Loop through each selected day of the weeks indices
-  reminder.recurrence.weekly.daysOfWeek.forEach((index) => {
-    // Ensure index is in range
-    if (index >= 0 && index < 7) {
-      // For each selected day, set flag to 1
-      daysOfWeekString[index] = '1';
-    }
-  });
-  // Join char array into a single string to store in database
-  const daysOfWeekDatabaseString = daysOfWeekString.join('');
-
-  // Make sure at least one weekday is selected
-  if (reminder.recurrence.weekly.daysOfWeek.length === 0) {
-    reminder.timeMessageError = 'Please select at least one day of the week for the event to occur.';
+  // Convert day of year to recur on to timestamp to store in database
+  // 00:00 time because only the date is used from this field
+  const recurDayTimestamp = convertTimeAndDateToTimestamp(recurDate, '00:00');
+  if (!recurDayTimestamp) {
+    reminder.timeMessageError = 'Invalid recurrence date.';
     return false;
   }
 
-  // Assign variables for DB saving
-  const timeOfDayMin = reminder.recurrence.weekly.timeOfDayMin;
-  const eventDurationMin = reminder.recurrence.weekly.eventDurationMin;
-  // Notification is set as long as its not 'never' (null)
-  const recurringNotifOffset = reminder.recurrence.weekly.notifOffsetTimeMin == null ? 0 : -Math.abs(reminder.recurrence.weekly.notifOffsetTimeMin);
-  const hasNotification = reminder.recurrence.weekly.notifOffsetTimeMin != null;
-  const everyNWeeks = reminder.recurrence.weekly.everyNWeeks;
-  // folderID already checked in saveRecurringReminder, cast to non-null bigint folder ID to save
-  const folderID: bigint = reminder.temporaryFolderID!;
+  // Assign local variables for DB saving
+  const timeOfDayMin = reminder.recurrence.yearly.timeOfDayMin;
+  const eventDurationMin = reminder.recurrence.yearly.eventDurationMin;
+  const recurringNotifOffset = reminder.recurrence.yearly.notifOffsetTimeMin == null ? 0 : -Math.abs(reminder.recurrence.yearly.notifOffsetTimeMin);
+  const hasNotification = reminder.recurrence.yearly.notifOffsetTimeMin != null;
+  const folderID: bigint = reminder.temporaryFolderID!; 
 
-
-  // Recurring reminder not saved to DB yet, create it
+   // Recurring reminder not saved to DB yet, create it
   if (!reminder.isSaved) {
-    const seriesID = await createWeeklyReminder(folderID, reminder.eventType, seriesStartTime, seriesEndTime, timeOfDayMin, eventDurationMin, recurringNotifOffset, hasNotification, everyNWeeks, daysOfWeekDatabaseString, reminder.temporaryTitle, extensionsToSend);
-    // Make sure draft ID matches DB ID so it gets replaced in UI
+    const seriesID = await createYearlyReminder(folderID, reminder.eventType, seriesStartTime, seriesEndTime, timeOfDayMin, eventDurationMin, recurringNotifOffset, hasNotification, recurDayTimestamp, reminder.temporaryTitle, extensionsToSend);
     reminder.itemID = seriesID;
     reminder.isSaved = true;
 
     // Fetch the newly created recurring reminder from the DB
-    const row = await readWeeklyReminder(seriesID);
+    const row = await readYearlyReminder(seriesID);
 
     // Map recurring reminder to UI format
     if (row) {
-      mapDBSeriesToUIRecurringReminder(row, 'weekly', true);
+      mapDBSeriesToUIRecurringReminder(row, 'yearly', true);
     }
 
-    // Load folders after creation
     folders.value = mapDBToUIFolder(await readAllFolders());
     reminder.timeMessageError = '';
     return true;
   } else {
     // Recurring reminder saved before, update it
     const originalRecurrenceType = reminder.originalRecurrenceType;
-    // Original recurrence type exists, so update existing recurring reminder
     if (originalRecurrenceType) {
-      await updateWeeklyReminder(reminder.itemID, folderID, reminder.eventType, seriesStartTime, seriesEndTime, timeOfDayMin, eventDurationMin, recurringNotifOffset, hasNotification, everyNWeeks, daysOfWeekDatabaseString, reminder.temporaryTitle, extensionsToSend);
-
+      // Update existing series in DB
+      await updateYearlyReminder(reminder.itemID, folderID, reminder.eventType, seriesStartTime, seriesEndTime, timeOfDayMin, eventDurationMin, recurringNotifOffset, hasNotification, recurDayTimestamp, reminder.temporaryTitle, extensionsToSend);
       // Fetch the updated recurring reminder from the DB
-      const row = await readWeeklyReminder(reminder.itemID);
-
+      const row = await readYearlyReminder(reminder.itemID);
       // Map recurring reminder to UI format
       if (row) {
-        mapDBSeriesToUIRecurringReminder(row, 'weekly', true);
+        mapDBSeriesToUIRecurringReminder(row, 'yearly', true);
       }
 
       folders.value = mapDBToUIFolder(await readAllFolders());
@@ -2937,18 +3156,17 @@ async function saveWeeklyReminder(reminder: UIReminder, extensionsToSend: Extens
     } else {
       // Original recurrence type is null, reminder is normal, convert it to a series
       // Create new series reminder
-      const seriesID = await createWeeklyReminder(folderID, reminder.eventType, seriesStartTime, seriesEndTime, timeOfDayMin, eventDurationMin, recurringNotifOffset, hasNotification, everyNWeeks, daysOfWeekDatabaseString, reminder.temporaryTitle, extensionsToSend);
+      const seriesID = await createYearlyReminder(folderID, reminder.eventType, seriesStartTime, seriesEndTime, timeOfDayMin, eventDurationMin, recurringNotifOffset, hasNotification, recurDayTimestamp, reminder.temporaryTitle, extensionsToSend);
       // Delete old normal reminder
       await deleteItem(reminder.itemID, 12);
-      const row = await readWeeklyReminder(seriesID);
-      // Map recurring reminder to UI format
+      const row = await readYearlyReminder(seriesID);
       if (row) {
-        mapDBSeriesToUIRecurringReminder(row, 'weekly', true);
+        mapDBSeriesToUIRecurringReminder(row, 'yearly', true);
       }
 
-      // Remove old normal reminder from UI
+      // Remove old normal reminder from UI list
       reminders.value = reminders.value.filter(r => String(r.itemID) !== String(reminder.itemID));
-
+      // Map recurring reminder to UI format
       folders.value = mapDBToUIFolder(await readAllFolders());
       await loadRemindersForCalendarDate(selectedDate.value);
       await loadRemindersForMonth(selectedDate.value);
@@ -3000,7 +3218,6 @@ async function saveReminder(reminder: UIReminder){
  }
 
   // Continue with normal reminder saving
-  
   const extension = reminder.extension ?? {};
 
   // Helper function to safely read string/time fields from extension record (as they are optional they can be missing or empty)
@@ -3428,6 +3645,12 @@ async function cancelReminder(reminder: UIReminder) {
         const row = await readMonthlyReminder(reminder.itemID);
         if (row) {
           mapDBSeriesToUIRecurringReminder(row, 'monthly', true)
+        }
+      }
+      else if (originalRecurrenceType === 'yearly') {
+        const row = await readYearlyReminder(reminder.itemID);
+        if (row) {
+          mapDBSeriesToUIRecurringReminder(row, 'yearly', true)
         }
       }
     } 

@@ -33,6 +33,7 @@ async function TestingSuiteRenderer() {
   await Test_Monthly();
   await Test_Yearly();
   await Test_GeneratedBasic();
+  await Test_Overrides();
   await Test_Folders();
 
   await ldb.clearAllTables();
@@ -543,6 +544,30 @@ async function Test_GeneratedBasic() {
   }
 }
 
+async function Test_Overrides() {
+  await ldb.clearAllTables();
+  await ldb.createRootFolder(0);
+
+  const startStamp1 = convertTimeAndDateToTimestamp("2001-01-01", "00:00");
+  const endStamp1 = convertTimeAndDateToTimestamp("2001-01-05", "23:59");
+  const timeOfDayMin1 = 30, eventDurationMin1 = 60, notifOffsetTimeMin1 = -10, hasNotifs1 = true;
+  const everyNDays1 = 2;
+  const daily1ID = await ldb.createDailyReminder(0n, 0, startStamp1, endStamp1, timeOfDayMin1, eventDurationMin1, notifOffsetTimeMin1, hasNotifs1, everyNDays1, "daily");
+  let dailies = await ldb.readGeneratedRemindersInRange(startStamp1, endStamp1);
+
+  const origEventStartTime = convertTimeAndDateToTimestamp("2001-01-03", "00:30");
+  const eventStartTime = convertTimeAndDateToTimestamp("2001-01-03", "00:20"); // change from 00:30 to 00:20
+  const eventEndTime = convertTimeAndDateToTimestamp("2001-01-03", "01:00"); // change from 60m to 30m
+  const notifTime = convertTimeAndDateToTimestamp("2001-01-03", "00:15"); // change from 00:20 to 00:15
+  await ldb.createOrUpdateOverride(dailies[1]!.itemID, origEventStartTime, eventStartTime, eventEndTime, notifTime, false);
+  dailies = await ldb.readGeneratedRemindersInRange(startStamp1, endStamp1);
+
+  const gen0 = dailies[0]!, gen1 = dailies[1]!, gen2 = dailies[2]!;
+  Test(true, gen0.eventStartDay == 1 && gen0.eventEndDay == 1 && gen0.eventStartMin == 30 && gen0.eventEndMin == 90 && gen0.notifDay == 1 && gen0.notifMin == 20, "gen0 must have correct time values");
+  Test(true, gen1.eventStartDay == 3 && gen1.eventEndDay == 3 && gen1.eventStartMin == 20 && gen1.eventEndMin == 60 && gen1.notifDay == 3 && gen1.notifMin == 15, "gen1 must have correct time values");
+  Test(true, gen2.eventStartDay == 5 && gen2.eventEndDay == 5 && gen2.eventStartMin == 30 && gen2.eventEndMin == 90 && gen2.notifDay == 5 && gen2.notifMin == 20, "gen2 must have correct time values");
+}
+
 async function Test_Folders() {
   await ldb.clearAllTables();
 
@@ -552,8 +577,8 @@ async function Test_Folders() {
   const folder3 = await ldb.createFolder(folder1, 0x0F0F0F, "name3");
   const folder4 = await ldb.createFolder(folder3, 0xF0F0F0, "name4");
   const folders = await ldb.readAllFolders();
-  Test(true, folders[1]!.parentFolderID == 0n && folders[1]!.colorCode == 0 && folders[1]!.folderName == "name1", "folder1 must match");
-  Test(true, folders[2]!.parentFolderID == 0n && folders[2]!.colorCode == 0xFFFFFF && folders[2]!.folderName == "name2", "folder2 must match");
-  Test(true, folders[3]!.parentFolderID == folder1 && folders[3]!.colorCode == 0x0F0F0F && folders[3]!.folderName == "name3", "folder3 must match");
-  Test(true, folders[4]!.parentFolderID == folder3 && folders[4]!.colorCode == 0xF0F0F0 && folders[4]!.folderName == "name4", "folder4 must match");
+  Test(true, folders[1]!.folderID == folder1 && folders[1]!.parentFolderID == 0n && folders[1]!.colorCode == 0 && folders[1]!.folderName == "name1", "folder1 must match");
+  Test(true, folders[2]!.folderID == folder2 && folders[2]!.parentFolderID == 0n && folders[2]!.colorCode == 0xFFFFFF && folders[2]!.folderName == "name2", "folder2 must match");
+  Test(true, folders[3]!.folderID == folder3 && folders[3]!.parentFolderID == folder1 && folders[3]!.colorCode == 0x0F0F0F && folders[3]!.folderName == "name3", "folder3 must match");
+  Test(true, folders[4]!.folderID == folder4 && folders[4]!.parentFolderID == folder3 && folders[4]!.colorCode == 0xF0F0F0 && folders[4]!.folderName == "name4", "folder4 must match");
 }

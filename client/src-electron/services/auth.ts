@@ -1,7 +1,7 @@
 /*
  * Authors: Maria Pasaylo, Kevin Sirantoine
  * Created: 2025-10-07
- * Updated: 2025-11-10
+ * Updated: 2025-11-24
  *
  * This file contains functions related to user authentication including getters
  * and setters for privateKey, username, password, and authToken.
@@ -183,7 +183,7 @@ export async function createAccount(username : string, password : string): Promi
 
     //Testing if we got the correct response
     // console.log('Response data', responseData);
-    console.log(response.status);
+    console.log("REGISTER STATUS: " + response.status);
 
     // //userID [0:8], authToken[8:40]
     const userIdBytes = Buffer.from(responseData.slice(0, 8));
@@ -245,7 +245,7 @@ export async function createAccount(username : string, password : string): Promi
       const responseData = response.data;
 
       //More testing
-      console.log(response.status);
+      console.log("LOGIN STATUS: " + response.status);
 
       //userID [0:8], authToken[8:40], privateKey1[40:72], privateKey2[72:104]
       const userIdBytes = Buffer.from(responseData.slice(0, 8));

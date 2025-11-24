@@ -1,7 +1,7 @@
 /*
  * Authors: Rachel Patella
  * Created: 2025-10-23
- * Updated: 2025-11-12
+ * Updated: 2025-11-24
  *
  * This file contains functions to build calendar events from reminders and retrieve event type details
  *
@@ -106,7 +106,6 @@ export function buildCalendarEvents(reminders: UIReminder[], eventTypes: EventTy
   return events;
 }
 
-
 // Map dates to array of events - key is date string, value is array of events on that date
 // script source code similar to slot - day month example
 // https://qcalendar.netlify.app/developing/qcalendar-month
@@ -144,4 +143,10 @@ export function getEventEndLabel(eventType: number) {
   }
   // General
   return 'Event End Time'; 
+}
+
+// Remove padding null characters from extension strings received by database for UI display
+export function stripNulls(fieldString?: string | null): string {
+  // Globally replace all null characters with empty string and trim whitespace
+  return (fieldString ?? '').replace(/\0/g, '').trim();
 }

@@ -372,7 +372,7 @@
                   label="Series End Date"
                   type="date"
                   :min="item.date"
-                  :max="endDateRangeRecurring(item.date)"
+                  :max="endDateRangeRecurring(item.date, selectedDate)"
                   outlined
                   dense
                   style="background-color: #f2f2f2; margin-bottom: 10px"
@@ -423,7 +423,7 @@
                   label="Series End Date"
                   type="date"
                   :min="item.date"
-                  :max="endDateRangeRecurring(item.date)"
+                  :max="endDateRangeRecurring(item.date, selectedDate)"
                   outlined
                   dense
                   style="background-color: #f2f2f2; margin-bottom: 10px"
@@ -489,7 +489,7 @@
                   label="Series End Date"
                   type="date"
                   :min="item.date"
-                  :max="endDateRangeRecurring(item.date)"
+                  :max="endDateRangeRecurring(item.date, selectedDate)"
                   outlined
                   dense
                   style="background-color: #f2f2f2; margin-bottom: 10px"
@@ -528,7 +528,7 @@
                   label="Series End Date"
                   type="date"
                   :min="item.date"
-                  :max="endDateRangeRecurring(item.date)"
+                  :max="endDateRangeRecurring(item.date, selectedDate)"
                   outlined
                   dense
                   style="background-color: #f2f2f2; margin-bottom: 10px"
@@ -561,8 +561,8 @@
                         type="date"
                         label="Event End Date"
                         v-model="item.temporaryEventEndDay"
-                        :min="endDateRange(item.date).min"
-                        :max="endDateRange(item.date).max"
+                        :min="endDateRange(item.date, selectedDate).min"
+                        :max="endDateRange(item.date, selectedDate).max"
                         style="font-size: 12px; background-color: #f2f2f2; margin-bottom: 8px;"
                       >
                       </q-input>
@@ -639,8 +639,8 @@
                       outlined
                       dense
                       type="date" 
-                      :min="endDateRange(item.date).min"
-                      :max="endDateRange(item.date).max"
+                      :min="endDateRange(item.date, selectedDate).min"
+                      :max="endDateRange(item.date, selectedDate).max"
                       class="flight-full"
                       style="width: 100%"
                     />
@@ -764,8 +764,8 @@
                     type="date"
                     label="Check-out Date"
                     v-model="item.temporaryEventEndDay"
-                    :min="endDateRange(item.date).min"
-                    :max="endDateRange(item.date).max"
+                    :min="endDateRange(item.date, selectedDate).min"
+                    :max="endDateRange(item.date, selectedDate).max"
                     style="width:100%;"
                     class = "flight-full"
                   />
@@ -816,9 +816,11 @@
               <div v-if="item.timeMessageError" style="color: #f44336; font-size: 13px; margin-bottom: 8px;">
                 {{ item.timeMessageError }}
               </div>
-                <div class="row">
+                <div class="row" style="display:flex; flex-wrap:wrap; align-items:center">
                   <q-btn class="login-register-button" style="font-size: 15px; margin-right: 10px" flat label="Save" @click="saveReminder(item)"></q-btn>
                   <q-btn class="login-register-button" style="background-color: grey; font-size: 15px" flat label="Cancel" @click="cancelReminder(item)"></q-btn>
+                  <q-btn v-if="item.isGenerated" class="login-register-button" style="font-size: 15px" flat label="View Series" @click="showParentSeriesFromGeneratedReminder(item)"></q-btn>
+                  <q-btn v-if="item.isRecurring && previousListState && String(previousListState.parentSeriesID) === String(item.itemID)" class="login-register-button" style="background-color: grey; font-size: 15px" flat label="View Generated" @click="showGeneratedReminderFromParentSeries()"></q-btn>
                 </div>
               </q-card-section>
             </q-expansion-item>
@@ -944,11 +946,12 @@
 </template>
 
 <script setup lang="ts">
+// Imports
 import {QCalendarMonth, addToDate, parseTimestamp, today, isLeapYear, type Timestamp} from '@quasar/quasar-ui-qcalendar';
 import '@quasar/quasar-ui-qcalendar/index.css';
-import {buildCalendarEvents, groupEventsByDate, getEventTypeColor, getEventTypeFields, getEventStartLabel, getEventEndLabel, type EventType, type CalendarEvent} from '../frontend-utils/events';
+import {buildCalendarEvents, groupEventsByDate, getEventTypeColor, getEventTypeFields, getEventStartLabel, stripNulls, getEventEndLabel, type EventType, type CalendarEvent} from '../frontend-utils/events';
 import { buildBreadcrumbs, normalizeFolderID, buildRootNodes} from '../frontend-utils/tree';
-import { convertTimeAndDateToTimestamp, convertNotificationTimestamp, minutesToHHMM, timeStamptoEpoch, normalizeDatePickerToCalendar, eventDatetoLocaleString } from '../frontend-utils/time';
+import { convertTimeAndDateToTimestamp, convertNotificationTimestamp, minutesToHHMM, timeStamptoEpoch, normalizeDatePickerToCalendar, eventDatetoLocaleString, endDateRange, endDateRangeRecurring } from '../frontend-utils/time';
 import { ref, computed, watch, onMounted } from 'vue';
 import type { UINote, UIReminder, UIFolder } from '../types/ui-types';
 import type { Reminder, DailyReminder, WeeklyReminder, MonthlyReminder, YearlyReminder, GeneratedReminder, Note, Folder, Extension } from '../../src-electron/types/shared-types';
@@ -963,97 +966,137 @@ import { ValidateFlight, ValidateHotel } from '../utils/validate';
 
 // Initialize active tab to reminder by default
 const tab = ref('reminders');
-const settingsTab = ref('cloud');
+// Array of normal, recurring, and generated reminders for list and file explorer
 const reminders = ref<UIReminder[]>([])
-// Array of reminders by month for calendar
+// Array of reminders loaded by month specifically for calendar
 const monthReminders = ref<UIReminder[]>([])
+// Array of notes
+const notes = ref<UINote[]>([])
 // Stores the array of full dates selected in qdate component for monthly recurrence
-const DaysOfMonthSelection = ref<string[]>([]);  
+const DaysOfMonthSelection = ref<string[]>([]);
+const selectAll = ref(false)
+const searchQuery = ref('');
+// Used to store the middle list state when viewing a parent series from generated to be able to go back 
+const previousListState = ref<{
+  // Switch to correct calendar date
+  calendarDate: string;
+  // Route back to generated card from parent series
+  generatedID: bigint;
+  // Route to parent series from generated card
+  parentSeriesID: bigint;
+} | null>(null);
 
-// Extract just the days from the full dates of the DaysOfMonthSelection
-// Use these days to set the daysOfMonth array in the MonthlyReminder recurrence 
-// Computed so that it updates automatically when DaysOfMonthSelection changes
-const selectedDayOfMonth = computed(() => {
-  // If daysOfMonthSelection is missing or empty, show empty string
-  if (!DaysOfMonthSelection.value || DaysOfMonthSelection.value.length === 0) {
-    return '';
+// Filtered reminder array for displaying only reminders that match the selected calendar date or search query
+const filteredReminders = computed(() => {
+  // Normalize search query: remove whitespace and convert to lowercase for case-insensitive matching
+  // Search functionality example: https://stackoverflow.com/questions/74670957/how-to-display-search-results-using-react-typescript
+  const query = (searchQuery.value ?? '').trim().toLowerCase();
+
+  // By default, middle list only shows normal reminders and recurring drafts (or saved reminders being converted to recurring)
+  const defaultReminderList = reminders.value.filter(reminder => !reminder.isRecurring || !reminder.isSaved || reminder.isConverting);
+
+ // No search query, either show recurring reminder if selected on file explorer
+ // Or show default list otherwise (normal reminders and recurring drafts)
+  if (!searchQuery.value) {
+    if (selectedFolderID.value !== null && selectedFolderID.value < 0n) {
+      const selectedNode = -selectedFolderID.value;
+      // Check if the selected tree node ID (converted to positive) matches a recurring reminder itemID
+      const recurringReminder = reminders.value.find(reminder => String(reminder.itemID) === String(selectedNode) && reminder.isRecurring && reminder.isSaved);
+      if (recurringReminder) {
+        return [recurringReminder];
+      }
+    }
+    else {
+      return defaultReminderList.filter(reminder => reminder.date === selectedDate.value);
+    }
   }
-   const days = DaysOfMonthSelection.value.map(dateString => {
-    // Split each date string ex. "YYYY/MM/DD" in the array by '/' delimiter to get each part
-    const parts = dateString.split('/');
 
-    // Last part is the day component "DD"
-    const dayPart = parts[2] ?? '';
-
-    // Convert the day string "DD" to an integer to get rid of leading zeros like "01" for q-input display
-    return parseInt(dayPart, 10);
-    // Sort the days numerically in ascending order for q-input display
-  }).sort((a, b) => a - b); 
-
-  // Join back the stripped day numbers into a comma-separated string for q-input display
-  return days.join(', ');
+  // Otherwise, if search query is provided, only search normal reminders and recurring drafts (default list) by title
+  return defaultReminderList.filter(reminder => {
+    // Check for reminders entries where the title is in the search query
+    const matchesQuery = String(reminder.temporaryTitle ?? '').toLowerCase().includes(query) || String(reminder.title ?? '').toLowerCase().includes(query);
+    // Return true if both date and query match
+    return matchesQuery;
+  });
 });
 
-// Helper function to determine days user can pick for event end day (from start day to one year later)
-// Hard limits reminders to +1 year from start date for event duration
-function endDateRange(startDate: string): { min: string; max: string } {
-  // Normalize inputted date string to yyyy-mm-dd format
-  let dateString = normalizeDatePickerToCalendar(startDate ?? '') || '';
-  // If provided startDate is empty/invalid, fallback to currently selected calendar date
-  if (!dateString) {
-    dateString = normalizeDatePickerToCalendar(String(selectedDate.value ?? '')) || '';
+// Filtered notes array for displaying only notes that match the search query
+const filteredNotes = computed(() => {
+  // Normalize search query: remove whitespace and convert to lowercase for case-insensitive matching
+  // Search functionality example: https://stackoverflow.com/questions/74670957/how-to-display-search-results-using-react-typescript
+  const query = (searchQuery.value ?? '').trim().toLowerCase();
+  if (!searchQuery.value) {
+    // If no search query, default show all the notes
+    return notes.value;
   }
 
-  if (dateString) {
-    const [yearString, monthString, dayString] = dateString.split('-');
-    const year = Number(yearString);
-    const month = Number(monthString);
-    const day = Number(dayString);
-    // Create a new start date object from inputted start date with 0 hours, minutes, seconds to compare full day
-    const sDate = new Date(year, month - 1, day);
-    sDate.setHours(0, 0, 0, 0);
+  // Otherwise, filter notes based on the search query (title)
+  return notes.value.filter(note => {
+    // Check for note entries where the title is in the search query
+    const matchesQuery = String(note.temporaryTitle ?? '').toLowerCase().includes(query) || String(note.title ?? '').toLowerCase().includes(query);
+    return matchesQuery;
+  });
+  });
 
-    const endDate = new Date(sDate);
-    // Takes the start date (0 time) and adds 365 days to it for max end date
-    endDate.setDate(endDate.getDate() + 365);
-
-    const startString = `${sDate.getFullYear()}-${String(sDate.getMonth() + 1).padStart(2, '0')}-${String(sDate.getDate()).padStart(2, '0')}`;
-    const endString = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`;
-
-    // Return the min and max date strings in yyyy-mm-dd format for date picker
-    return { min: startString, max: endString };
+// Function to show the parent series in middle list linked to generated reminder
+// Occurs when user clicks navigate to parent from a generated reminder card
+function showParentSeriesFromGeneratedReminder(generatedReminder: UIReminder) {
+  // Not a generated reminder or linked parent ID is missing
+  if (!generatedReminder || generatedReminder.linkedParentSeriesID == null) {
+    return;
   }
 
-  // If input is invalid or empty, return empty strings to satisfy the declared return type
-  return { min: '', max: '' };
+  // Save current default list view (generated + normal reminders) before switching to series view
+  previousListState.value = {
+    calendarDate: selectedDate.value,
+    generatedID: generatedReminder.itemID,
+    parentSeriesID: generatedReminder.linkedParentSeriesID
+  }
+
+  // Try to find parent series reminder linked to this generated reminder
+  const parentSeries = reminders.value.find(reminder => String(reminder.itemID) === String(generatedReminder.linkedParentSeriesID))
+  // Return if parent cannot be found
+  if (!parentSeries) {
+    return;
+  }
+
+  // Parent found, switch middle list view to show the generated reminders parent series
+  tab.value = 'reminders';
+  // Route to the date that the series was created on
+  selectedDate.value = parentSeries.date;
+  // Select parent series on file explorer so filteredReminders shows the series in the middle
+  selectedFolderID.value = -parentSeries.itemID; 
+  // Collapse all other reminders and expand parent series
+  reminders.value.forEach(reminder => reminder.expanded = false);
+  parentSeries.expanded = true
 }
 
-// Helper function to determine days user can pick for series end day (from start day to 100 years later)
-function endDateRangeRecurring(startDate: string) {
-  let dateString = normalizeDatePickerToCalendar(startDate ?? '') || '';
-  // If provided startDate is empty/invalid, fallback to currently selected calendar date
-  if (!dateString) {
-    dateString = normalizeDatePickerToCalendar(String(selectedDate.value ?? '')) || '';
+// Function to return back to middle list (normal reminders and generated) from parent series card
+function showGeneratedReminderFromParentSeries() {
+  if (!previousListState.value) {
+    return;
   }
+  
+  // Restore calendar date back to previous calendar-selected generated reminders date
+  selectedDate.value = previousListState.value.calendarDate;
 
-  if (dateString) {
-    const [yearString, monthString, dayString] = dateString.split('-');
-    const year = Number(yearString);
-    const month = Number(monthString);
-    const day = Number(dayString);
-    // Create a new start date object from inputted start date with 0 hours, minutes, seconds to compare full day
-    const sDate = new Date(year, month - 1, day);
-    sDate.setHours(0, 0, 0, 0);
+  // Unselect the parent file explorer node
+  selectedFolderID.value = null;
 
-    const endDate = new Date(sDate);
-    // Takes the start date (0 time) and add 100 years for end date
-    endDate.setFullYear(endDate.getFullYear() + 100);
-    const endString = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`;
-
-    return endString;
+  // Find the generated reminder thats a child of the parent series from before
+  const generated = reminders.value.find(reminder => String(reminder.itemID) === String(previousListState.value!.generatedID))
+  // If found, collapse all other reminders and expand the generated
+  if (generated) {
+    tab.value = 'reminders';
+    reminders.value.forEach(reminder => reminder.expanded = false);
+    generated.expanded = true;
+    // Clear out saved list state view
+    previousListState.value = null;
+    return;
   }
 }
 
+// Notification and dropdown variables/functions
 // List of notification options for when to be notified for reminder
 // Value is minutes before the event start time
 const notificationOptions = [
@@ -1132,9 +1175,7 @@ const daysOfWeekOptions = [
     }
   }
 
-// Array of notes
-const notes = ref<UINote[]>([])
-
+// Event type variables/functions
 // Object of event types for UI
 const eventTypes: EventType[] = [
    {
@@ -1253,8 +1294,6 @@ const eventTypes: EventType[] = [
     // Neither of the times have set values, return undefined, treat as empty
     return undefined;
   };
-
-
     // Flight
     switch (reminder.eventType) {
       case 1: {
@@ -1331,6 +1370,8 @@ const eventTypeOptions = computed(() => {
   }));
 });
 
+// Settings and cloud sync variables/functions
+const settingsTab = ref('cloud');
 const showSettings = ref(false);
 const showLoginOptions = ref(false);
 const showChangeLogin = ref(false);
@@ -1366,6 +1407,29 @@ async function onToggleCloudSync() {
   }
 }
 
+// Change icon depending on cloud sync status
+const cloudIcon = computed(() => {
+  // Cloud toggle is off
+  if (!isCloudOn.value) {
+    return 'cloud_off'
+  }
+  // Currently syncing
+  if (isSyncing.value) {
+    return 'cloud_sync'
+  }
+  // Sync successful
+  if (syncStatusMessage.value === 'Cloud Synced Successfully') {
+    return 'cloud_done'
+  }
+  // Sync failed
+  if (syncStatusMessage.value === 'Cloud Sync Failed') {
+    return 'cloud_off'
+  }
+  // Default
+  return 'cloud'
+})
+
+// Main functionality (CRUD on recurrence, generated, normal reminders and notes)
 // Since a recurrence is an optional property, function to safely toggle checkbox
 function onToggleRecurrenceType(item: UIReminder, enabled: boolean) {
   // isRecurring property uses checkbox value from user
@@ -1455,36 +1519,30 @@ else if (val === 'weekly' && !recurrence.weekly) {
   }}
 }
 
+// Extract just the days from the full dates of the DaysOfMonthSelection
+// Use these days to set the daysOfMonth array in the MonthlyReminder recurrence 
+// Computed so that it updates automatically when DaysOfMonthSelection changes
+const selectedDayOfMonth = computed(() => {
+  // If daysOfMonthSelection is missing or empty, show empty string
+  if (!DaysOfMonthSelection.value || DaysOfMonthSelection.value.length === 0) {
+    return '';
+  }
+   const days = DaysOfMonthSelection.value.map(dateString => {
+    // Split each date string ex. "YYYY/MM/DD" in the array by '/' delimiter to get each part
+    const parts = dateString.split('/');
 
-// Change icon depending on cloud sync status
-const cloudIcon = computed(() => {
-  // Cloud toggle is off
-  if (!isCloudOn.value) {
-    return 'cloud_off'
-  }
-  // Currently syncing
-  if (isSyncing.value) {
-    return 'cloud_sync'
-  }
-  // Sync successful
-  if (syncStatusMessage.value === 'Cloud Synced Successfully') {
-    return 'cloud_done'
-  }
-  // Sync failed
-  if (syncStatusMessage.value === 'Cloud Sync Failed') {
-    return 'cloud_off'
-  }
-  // Default
-  return 'cloud'
-})
+    // Last part is the day component "DD"
+    const dayPart = parts[2] ?? '';
 
-const selectAll = ref(false)
-const searchQuery = ref('');
-const newUsername = ref<string>('');
-const newPassword = ref<string>('');
-const isPwd = ref(true);
-const $q = useQuasar();
-const router = useRouter();
+    // Convert the day string "DD" to an integer to get rid of leading zeros like "01" for q-input display
+    return parseInt(dayPart, 10);
+    // Sort the days numerically in ascending order for q-input display
+  }).sort((a, b) => a - b); 
+
+  // Join back the stripped day numbers into a comma-separated string for q-input display
+  return days.join(', ');
+});
+
 
 // Specific folder ID currently selected in the file explorer tree, tracked for adding folder in that specific spot
 // null is if there is no folder selected on the tree, this by default
@@ -1500,7 +1558,6 @@ const folderDropdownOptions = computed(() => {
     value: folder.folderID
   }));
 });
-
 
 // Function to get reminder by its ID
 function getReminder(id?: bigint | null): UIReminder | null {
@@ -1869,7 +1926,7 @@ async function loadGeneratedReminders(dateString: string) {
 
     // Read the viewable calendar month
     const currentMonthReminders = await readGeneratedRemindersInRange(startRange, endRange);
-    console.log('📅 Current month generated reminders from DB:', currentMonthReminders.length, currentMonthReminders); // DEBUG
+    //console.log('Current month generated reminders from DB:', currentMonthReminders.length, currentMonthReminders); // DEBUG
     // Convert each generated reminder in range from response to UI reminder format 
     for (const generatedReminder of currentMonthReminders) {
       // Map to UI and push to middle list (reminders array)
@@ -1880,17 +1937,13 @@ async function loadGeneratedReminders(dateString: string) {
 
     // Read the next month after
     const nextMonthReminders = await readGeneratedRemindersInRange(nextMonthStartRange, nextMonthEndRange);
-     console.log('📅 Next month generated reminders from DB:', nextMonthReminders.length, nextMonthReminders); // DEBUG
+    //console.log('Next month generated reminders from DB:', nextMonthReminders.length, nextMonthReminders); // DEBUG
     // Convert each generated reminder in range from response to UI reminder format
     for (const generatedReminder of nextMonthReminders) {
       // Map to UI and push to middle list (reminders array)
       // Do not push to monthReminders since its not in the current month view
       mapDBGeneratedToUIReminder(generatedReminder, true);
     }
-
-    console.log('✅ Total generated reminders in reminders.value:', reminders.value.filter(r => r.isGenerated).length); // DEBUG
-    console.log('Generated reminders:', reminders.value.filter(r => r.isGenerated)); // DEBUG
-
   } catch (error) {
     console.error('Error loading reminders for month:', error);
   } 
@@ -2015,12 +2068,7 @@ async function addRootFolder() {
   }
 }
 
-// Remove padding null characters from extension strings received by database for UI display
-function stripNulls(fieldString?: string | null): string {
-  // Globally replace all null characters with empty string and trim whitespace
-  return (fieldString ?? '').replace(/\0/g, '').trim();
-}
-
+// Mapper functions to map database rows to UI
 // Map a DB reminder row into the UI reminder shape needed for card display
 // Additional upsert parameter decides whether to add/update the global reminders array
 function mapDBToUIReminder(row: Reminder, upsert: boolean): UIReminder {
@@ -2321,8 +2369,6 @@ function mapDBGeneratedToUIReminder(row: GeneratedReminder, upsert: boolean): UI
 }
   return UIReminder;
 }
-
-
 
 // Map a DB recurring reminder row into the UI reminder shape needed for card display
 // Additional upsert parameter decides whether to add/update the global reminders array
@@ -3967,19 +4013,7 @@ async function cancelNote(note: UINote) {
   }
 }
 
-// Watcher on the checkbox to select and deselect all reminders or notes when select all checkbox is toggled
-watch(selectAll, (selectionVal) => {
-  if (tab.value === 'reminders') {
-    filteredReminders.value.forEach(reminder => {
-      reminder.isSelected = selectionVal;
-    });
-  } else if (tab.value === 'notes') {
-    notes.value.forEach(note => {
-      note.isSelected = selectionVal;
-    });
-  }
-});
-
+// Calendar functionality and watchers
 // template and script source code from slot - day month example
 // https://qcalendar.netlify.app/developing/qcalendar-month
 const calendar = ref<QCalendarMonth>(),
@@ -3992,48 +4026,6 @@ const formattedMonth = computed(() => {
   const formatter = monthFormatter()
   return formatter ? formatter.format(date) : ''
 })
-
-// Filtered reminder array for displaying only reminders that match the selected calendar date or search query
-const filteredReminders = computed(() => {
-  //return reminders.value.filter(reminder => reminder.date === selectedDate.value)
-  // Normalize search query: remove whitespace and convert to lowercase for case-insensitive matching
-  // Search functionality example: https://stackoverflow.com/questions/74670957/how-to-display-search-results-using-react-typescript
-  const query = (searchQuery.value ?? '').trim().toLowerCase();
-
-  // By default, middle list only shows normal reminders and recurring drafts (or saved reminders being converted to recurring)
-  const defaultReminderList = reminders.value.filter(reminder => !reminder.isRecurring || !reminder.isSaved || reminder.isConverting);
-
- // No search query, either show recurring reminder if selected on file explorer
- // Or show default list otherwise (normal reminders and recurring drafts)
-  if (!searchQuery.value) {
-    if (selectedFolderID.value !== null && selectedFolderID.value < 0n) {
-      const selectedNode = -selectedFolderID.value;
-      // Check if the selected tree node ID (converted to positive) matches a recurring reminder itemID
-      const recurringReminder = reminders.value.find(reminder => String(reminder.itemID) === String(selectedNode) && reminder.isRecurring && reminder.isSaved);
-      if (recurringReminder) {
-        return [recurringReminder];
-      }
-    }
-    else {
-      return defaultReminderList.filter(reminder => reminder.date === selectedDate.value);
-    }
-  }
-
-  // Otherwise, if search query is provided, only search normal reminders and recurring drafts (default list) by title
-  return defaultReminderList.filter(reminder => {
-    // Check for reminders entries where the title is in the search query
-    const matchesQuery = String(reminder.temporaryTitle ?? '').toLowerCase().includes(query) || String(reminder.title ?? '').toLowerCase().includes(query);
-    // Return true if both date and query match
-    return matchesQuery;
-  });
-});
-
-// Reload list of reminders whenever the selected calendar date changes
-watch(selectedDate, async (newDate) => {
-  // Load reminders for newly selected calendar date
-  await loadRemindersForCalendarDate(newDate);
-  await loadGeneratedReminders(newDate);
-});
 
 // Create events on calendar from reminders
 const events = computed(() => buildCalendarEvents(monthReminders.value, eventTypes))
@@ -4053,24 +4045,25 @@ function onClickCalendarEvent(event: CalendarEvent) {
   reminder.expanded = true;
 }
 
-// Filtered notes array for displaying only notes that match the search query
-const filteredNotes = computed(() => {
-  // Normalize search query: remove whitespace and convert to lowercase for case-insensitive matching
-  // Search functionality example: https://stackoverflow.com/questions/74670957/how-to-display-search-results-using-react-typescript
-  const query = (searchQuery.value ?? '').trim().toLowerCase();
-  if (!searchQuery.value) {
-    // If no search query, default show all the notes
-    return notes.value;
+// Watcher on the checkbox to select and deselect all reminders or notes when select all checkbox is toggled
+watch(selectAll, (selectionVal) => {
+  if (tab.value === 'reminders') {
+    filteredReminders.value.forEach(reminder => {
+      reminder.isSelected = selectionVal;
+    });
+  } else if (tab.value === 'notes') {
+    notes.value.forEach(note => {
+      note.isSelected = selectionVal;
+    });
   }
+});
 
-  // Otherwise, filter notes based on the search query (title)
-  return notes.value.filter(note => {
-    // Check for note entries where the title is in the search query
-    const matchesQuery = String(note.temporaryTitle ?? '').toLowerCase().includes(query) || String(note.title ?? '').toLowerCase().includes(query);
-    return matchesQuery;
-  });
-  });
-
+// Reload list of reminders whenever the selected calendar date changes
+watch(selectedDate, async (newDate) => {
+  // Load reminders for newly selected calendar date
+  await loadRemindersForCalendarDate(newDate);
+  await loadGeneratedReminders(newDate);
+});
 
 // Watcher to unselect the select all checkbox if there are no reminders or notes in the array (ex. none made or after deletion)
 watch([filteredReminders, notes, tab], () => {
@@ -4157,6 +4150,12 @@ function onClickHeadWorkweek(data: Timestamp) {
   console.info('onClickHeadWorkweek', data)
 }
 
+// Account variables/functions
+const newUsername = ref<string>('');
+const newPassword = ref<string>('');
+const isPwd = ref(true);
+const $q = useQuasar();
+const router = useRouter();
 async function logout()
 {
   try {
@@ -4212,5 +4211,4 @@ async function saveLoginChanges() {
   }
 
 }
-
 </script>

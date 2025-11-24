@@ -1,7 +1,7 @@
 <!--
  * Authors: Rachel Patella, Maria Pasaylo, Michael Jagiello
  * Created: 2025-09-22
- * Updated: 2025-11-23
+ * Updated: 2025-11-24
  *
  * This file is the main home page that includes the calendar view, notes/reminders list, 
  * and a file explorer as a 3 column grid layout.
@@ -212,11 +212,13 @@
             <q-expansion-item v-model="item.expanded" expand-icon="keyboard_arrow_down">
               <template v-slot:header>
                   <div class="reminder-header-container">
+                    <!--- Title is readonly and not editable for a generated reminder. Generated titles stay the same as its parent series title. -->
                     <q-checkbox :color="getEventTypeColor(eventTypes, item.eventType)" v-model="item.isSelected" class="q-mr-sm" />
                     <q-input
                       v-model="item.temporaryTitle"
                       :error="item.titleMessageError != ''"
                       :error-message="item.titleMessageError"
+                      :readonly="item.isGenerated"
                       placeholder="Enter reminder title..."
                       borderless
                       dense
@@ -226,8 +228,8 @@
                       maxlength="48"
                       />
                     </div>
-              </template>
-              <q-card-section>
+                    </template>
+                    <q-card-section>
                      <div style="padding-bottom:10px">
                       <!-- Single-day non-recurring reminder -->
                       <template v-if="!item.isRecurring && !item.temporaryEventEndDateEnabled">
@@ -261,10 +263,16 @@
                         Series end: {{eventDatetoLocaleString(item.recurrence.yearly.seriesEndDate)}}<br>
                       </template>
                       
+                      <template v-if="!item.isGenerated">
                       Last modified: {{ item.temporaryLastModified }}
+                      </template>
+
+                      <div v-if="item.isGenerated">
+                      This is a generated reminder from a recurring series. Title, folder, and event type are not editable.
+                      </div>
                     </div>
                 <q-checkbox
-                  v-if="!item.isRecurring"
+                  v-if="!item.isRecurring && !item.isGenerated"
                   v-model="item.temporaryEventEndDateEnabled"
                   label="Multi‑day"
                   dense
@@ -274,7 +282,7 @@
                 />
                 <br>
                 <q-checkbox
-                   v-if="!item.temporaryEventEndDateEnabled"
+                   v-if="!item.temporaryEventEndDateEnabled && !item.isGenerated"
                   v-model="item.isRecurring"
                   @update:model-value="val => onToggleRecurrenceType(item, val)"
                   label="Recurring"
@@ -286,6 +294,7 @@
                 <q-select
                 v-model="item.eventType"
                 :options="eventTypeOptions"
+                :disable="item.isGenerated"
                 label="Event Type"
                 emit-value
                 map-options
@@ -296,6 +305,7 @@
                 <q-select
                 v-model="item.temporaryFolderID"
                 :options="folderDropdownOptions"
+                :disable="item.isGenerated"
                 label="Save in folder"
                 emit-value 
                 map-options
@@ -897,23 +907,21 @@
                 @click-date="onClickDate" @click-day="onClickDay" @click-workweek="onClickWorkweek"
                 @click-head-workweek="onClickHeadWorkweek" @click-head-day="onClickHeadDay" style="height: 400px;" >
                 <template #day="{ scope: { timestamp } }">
+                <div style="display: flex; flex-direction: column; gap: 3px; padding: 2px; align-items: center; justify-content: center;">
               <template v-for="event in eventsMap[timestamp.date]" :key="String(event.id)">
                 <div
-                  :class="['text-white', `bg-${event.color}`, 'row', 'justify-start', 'items-center',  'event-card']"
-                  style="width: 100%; margin: 1px 0 0 0; padding: 0 6px; font-size: 12px; cursor: pointer;"
-                  @click="onClickCalendarEvent(event)"
-                >
-                  <q-icon :name="event.icon || 'access_time'" size="14px" class="q-mr-xs" />
-                  <div class="event-title" style="width: 100%; max-width: 100%;">
-                  {{ event.title}}
-                  </div>
+                :class="`bg-${event.color}`"
+                style="width: 8px; height: 8px; border-radius: 50%; cursor: pointer;"
+                @click="onClickCalendarEvent(event)"
+              >
                 <!-- Tooltip on hover to clarify if event start or end -->
                 <q-tooltip v-if="event.isStart || event.isEnd">
                   <!-- If single day, combined start and end labels. If multi-day start and end separate labels. -->
-                  {{ (event.isStart && event.isEnd) ? 'Event start & end' : (event.isStart ? 'Event start' : 'Event end') }}
+                  {{ (event.isStart && event.isEnd) ? `${event.title} event` : (event.isStart ? `${event.title} event start` : `${event.title} event end`) }}
                 </q-tooltip>
                 </div>
               </template>
+              </div>
             </template>
               </q-calendar-month>
             </div>
@@ -943,7 +951,7 @@ import { buildBreadcrumbs, normalizeFolderID, buildRootNodes} from '../frontend-
 import { convertTimeAndDateToTimestamp, convertNotificationTimestamp, minutesToHHMM, timeStamptoEpoch, normalizeDatePickerToCalendar, eventDatetoLocaleString } from '../frontend-utils/time';
 import { ref, computed, watch, onMounted } from 'vue';
 import type { UINote, UIReminder, UIFolder } from '../types/ui-types';
-import type { Reminder, DailyReminder, WeeklyReminder, MonthlyReminder, YearlyReminder, Note, Folder, Extension } from '../../src-electron/types/shared-types';
+import type { Reminder, DailyReminder, WeeklyReminder, MonthlyReminder, YearlyReminder, GeneratedReminder, Note, Folder, Extension } from '../../src-electron/types/shared-types';
 import {createNote, createReminder, createDailyReminder, createWeeklyReminder, createMonthlyReminder, createYearlyReminder, createOrUpdateOverride, createFolder, createRootFolder,
   readNote, readNotesInRange, readReminder, readDailyReminder, readWeeklyReminder, readMonthlyReminder, readYearlyReminder, readRemindersInRange, readDailyRemindersInRange, readWeeklyRemindersInRange, readMonthlyRemindersInRange, readYearlyRemindersInRange, readGeneratedRemindersInRange, readAllFolders, 
   updateNote, updateReminder, updateDailyReminder, updateWeeklyReminder, updateMonthlyReminder, updateYearlyReminder, updateFolder, 
@@ -956,7 +964,6 @@ import { ValidateFlight, ValidateHotel } from '../utils/validate';
 // Initialize active tab to reminder by default
 const tab = ref('reminders');
 const settingsTab = ref('cloud');
-// Array of reminders 
 const reminders = ref<UIReminder[]>([])
 // Array of reminders by month for calendar
 const monthReminders = ref<UIReminder[]>([])
@@ -1700,6 +1707,7 @@ function addReminder() {
     temporaryLastModified: new Date().toLocaleString(),
     temporaryTitle: '',
     temporaryFolderID: folderID,
+    temporaryEventEndDateEnabled: false,
     date: selectedDate.value,
     titleMessageError: '',
     folderMessageError: '',
@@ -1708,9 +1716,10 @@ function addReminder() {
     isEditing: false,
     isSelected: false,
     expanded: true,
-    temporaryEventEndDateEnabled: false,
     isRecurring: false,
-    isConverting: false
+    isConverting: false,
+    isGenerated: false,
+    linkedParentSeriesID: null
   } as UIReminder;
 
   // Add draft reminder to reminders array for UI rendering
@@ -1800,6 +1809,89 @@ async function loadRemindersForMonth(dateString: string) {
         // console.log('Reminders for month successfully loaded:');
       }
     } catch (error) {
+    console.error('Error loading reminders for month:', error);
+  } 
+}
+
+// Load generated reminders for the current viewable calendar month + next month
+async function loadGeneratedReminders(dateString: string) {
+// Split date string by delimiter '-' to get each part (year, month, day)
+  const [yearString, monthString, dayString] = dateString.split('-');
+  const year = Number(yearString);
+  const month = Number(monthString);
+  const day = Number(dayString);
+
+  // Check for invalid month
+  if (month < 1 || month > 12) {
+    console.error('Invalid month value:', month);
+    return;
+  }
+
+  // Check for invalid day
+  if (day < 1 || day > 31) {
+    console.error('Invalid day value:', day);
+    return;
+  }
+
+  // Check for invalid year
+  if (year < 1) {
+    console.error('Invalid year value:', year);
+    return;
+  }
+
+  // Build start and end timestamps to load in range (from first day to last day of month)
+  // First day of the month - ex. 2025-11-01
+  const startDayOfMonth= `${year}-${String(month).padStart(2, '0')}-01`;
+  // Last day of the month - ex. 2025-11-30
+  // Date returns the day before the first day of the next month (always the last day - ex. 30 for Nov, 31 for Dec, 28 for Feb)
+  const lastDayOfMonth = new Date(year, month, 0).getDate();
+  const lastDayString = `${year}-${String(month).padStart(2, '0')}-${String(lastDayOfMonth).padStart(2, '0')}`;
+
+  // Convert to qcalendar timestamps
+  const startRange = convertTimeAndDateToTimestamp(startDayOfMonth, '');
+  const endRange = convertTimeAndDateToTimestamp(lastDayString, '23:59');
+
+  // Build start and end timestamps for next month 
+  // This is necessary because notifications are only scheduled for generated reminders on frontend read
+  // If month is December, roll over to January of the next year. Otherwise, increment the month and stay in the year
+  const nextMonth = (month === 12) ? 1 : month + 1;
+  const nextYear = (month === 12) ? year + 1 : year;
+  const nextMonthStartDay = `${nextYear}-${String(nextMonth).padStart(2, '0')}-01`;
+  const nextMonthLastDay = new Date(nextYear, nextMonth, 0).getDate();
+  const nextMonthLastDayString = `${nextYear}-${String(nextMonth).padStart(2, '0')}-${String(nextMonthLastDay).padStart(2, '0')}`;
+  const nextMonthStartRange = convertTimeAndDateToTimestamp(nextMonthStartDay, '');
+  const nextMonthEndRange = convertTimeAndDateToTimestamp(nextMonthLastDayString, '23:59');
+
+  try {
+    // Clear existing generated reminders before reloading to avoid duplicates
+    reminders.value = reminders.value.filter(reminder => !reminder.isGenerated);
+    monthReminders.value = monthReminders.value.filter(reminder => !reminder.isGenerated);
+
+    // Read the viewable calendar month
+    const currentMonthReminders = await readGeneratedRemindersInRange(startRange, endRange);
+    console.log('📅 Current month generated reminders from DB:', currentMonthReminders.length, currentMonthReminders); // DEBUG
+    // Convert each generated reminder in range from response to UI reminder format 
+    for (const generatedReminder of currentMonthReminders) {
+      // Map to UI and push to middle list (reminders array)
+      const result = mapDBGeneratedToUIReminder(generatedReminder, true);
+      // Push generated reminder to current month calendar view
+      monthReminders.value.push(result);
+    }
+
+    // Read the next month after
+    const nextMonthReminders = await readGeneratedRemindersInRange(nextMonthStartRange, nextMonthEndRange);
+     console.log('📅 Next month generated reminders from DB:', nextMonthReminders.length, nextMonthReminders); // DEBUG
+    // Convert each generated reminder in range from response to UI reminder format
+    for (const generatedReminder of nextMonthReminders) {
+      // Map to UI and push to middle list (reminders array)
+      // Do not push to monthReminders since its not in the current month view
+      mapDBGeneratedToUIReminder(generatedReminder, true);
+    }
+
+    console.log('✅ Total generated reminders in reminders.value:', reminders.value.filter(r => r.isGenerated).length); // DEBUG
+    console.log('Generated reminders:', reminders.value.filter(r => r.isGenerated)); // DEBUG
+
+  } catch (error) {
     console.error('Error loading reminders for month:', error);
   } 
 }
@@ -1932,7 +2024,7 @@ function stripNulls(fieldString?: string | null): string {
 // Map a DB reminder row into the UI reminder shape needed for card display
 // Additional upsert parameter decides whether to add/update the global reminders array
 function mapDBToUIReminder(row: Reminder, upsert: boolean): UIReminder {
-  // Create a date in local timezone from DB row for UI so filtered reminder/note list only shows entries whose event date match the calendar date
+  // Create a date in local timezone from DB row for UI so filtered reminderlist only shows entries whose event date match the calendar date
   // Get minute of day, event day, and event year from DB row
   const minuteOfDay = Number(row.eventStartMin);
   const eventDay = Number(row.eventStartDay);
@@ -2062,6 +2154,8 @@ function mapDBToUIReminder(row: Reminder, upsert: boolean): UIReminder {
     isSelected: false,
     isRecurring: false,
     isConverting: false,
+    isGenerated: false,
+    linkedParentSeriesID: null,
     expanded: true
   } as UIReminder;
 
@@ -2080,6 +2174,154 @@ function mapDBToUIReminder(row: Reminder, upsert: boolean): UIReminder {
 }
   return UIReminder;
 }
+
+// Map a DB generated reminder row into the UI reminder shape needed for card display
+// Additional upsert parameter decides whether to add/update the global reminders array
+function mapDBGeneratedToUIReminder(row: GeneratedReminder, upsert: boolean): UIReminder {
+  // Create a date in local timezone from DB row for UI so filtered reminder list only shows entries whose event date match the calendar date
+  // Get minute of day, event day, and event year from DB row
+  const minuteOfDay = Number(row.eventStartMin);
+  const eventDay = Number(row.eventStartDay);
+  const eventYear = Number(row.eventStartYear);
+  // Start at january 1st of event year and add days to get the right month/day
+  const date = new Date(eventYear, 0, 1);
+  // Set date object to event day
+  date.setDate(date.getDate() + (eventDay - 1));
+  // Calculate hours: divide number of minutes by 60 to get hours
+  // Floor to return actual integer hour, no decimals
+  const eventHour = Math.floor(minuteOfDay / 60);
+  // Calculate remaining minutes: take minutes and modulo 60 (remainder is number of minutes)
+  const eventMinute = minuteOfDay % 60;
+  // Set hours and minutes of date object
+  date.setHours(eventHour, eventMinute, 0, 0);
+  // Convert date to YYYY-MM-DD string format compatible with qcalendar/selectedDate
+  // getMonth returns zero-based index add 1 to get actual month number
+  // Pad month and day so its always two digits - ex. day 5 becomes 05
+  const dateString = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
+  const endMinuteOfDay = Number(row.eventEndMin);
+  const endEventDay = Number(row.eventEndDay);
+  const endEventYear = Number(row.eventEndYear);
+  const endDate = new Date(endEventYear, 0, 1);
+  endDate.setDate(endDate.getDate() + (endEventDay - 1));
+  const eventEndHour = Math.floor(endMinuteOfDay / 60);
+  const eventEndMinute = endMinuteOfDay % 60;
+  endDate.setHours(eventEndHour, eventEndMinute, 0, 0);
+  const endDateString = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`;
+
+  // UI reminder extension fields as a record, these are the actual values taken from frontend input fields 
+  const extensionsUI = {} as Record<string, string | number | null | undefined>;
+
+  // DB reminder row with extensions
+  const extensionsArr = (row as GeneratedReminder & { extensions?: Extension[] }).extensions;
+
+  // Derive HH:MM time strings for display from database stored minutes of day value
+  // Convert event start and end min into HH:MM string
+  let startStr = (typeof row.eventStartMin === 'number') ? minutesToHHMM(row.eventStartMin) : '';
+  let endStr = (typeof row.eventEndMin === 'number') ? minutesToHHMM(row.eventEndMin) : '';
+
+  if (!startStr) {
+    startStr = '';
+  }
+  if (!endStr) {
+    endStr = '';
+  }
+
+  const eventStartMin = typeof row.eventStartMin === 'number' ? row.eventStartMin : null;
+  const notifMin = typeof row.notifMin === 'number' ? row.notifMin : null;
+  // Compute dropdown remind me option (ex. 5 mins before event time)
+  const minutesBeforeStartTime = (row.hasNotif === 1 && eventStartMin != null && notifMin != null) ? eventStartMin - notifMin : null;
+
+  // If extensions array exists, map each extension into extensions UI record
+  if (extensionsArr && extensionsArr.length > 0) {
+    // If a flight, extract flight fields
+    if (row.eventType === 1) {
+      const flightFields = ExtensionsToFlight(extensionsArr);
+      console.log('flightFields', flightFields, 'extensionsUI', extensionsUI);
+      if (flightFields) {
+        extensionsUI.depAirportName = stripNulls(flightFields.depAirportName ?? '');
+        extensionsUI.depAirportAddress = stripNulls(flightFields.depAirportAddress ?? '');
+        extensionsUI.arrAirportName = stripNulls(flightFields.arrAirportName ?? '');
+        extensionsUI.arrAirportAddress = stripNulls(flightFields.arrAirportAddress ?? '');
+        extensionsUI.airlineCode = stripNulls(flightFields.airlineCode ?? '');
+        extensionsUI.flightNumber = stripNulls(flightFields.flightNumber ?? '');
+        extensionsUI.airlineName = stripNulls(flightFields.airlineName ?? '');
+        extensionsUI.depAirportIATA = stripNulls(flightFields.depAirportIATA ?? '');
+        extensionsUI.depTime = minutesToHHMM(flightFields.depTimeMin);
+        extensionsUI.boardingTime = minutesToHHMM(flightFields.boardingTimeMin);
+        extensionsUI.boardingGroup = stripNulls(flightFields.boardingGroup ?? '');
+        extensionsUI.gate = stripNulls(flightFields.gate ?? '');
+        extensionsUI.arrAirportIATA = stripNulls(flightFields.arrAirportIATA ?? '');
+        extensionsUI.arrTime = minutesToHHMM(flightFields.arrTimeMin);
+      }
+    }
+    // If a hotel, extract hotel fields
+    else if (row.eventType === 2) {
+      const hotelFields = ExtensionsToHotel(extensionsArr);
+      if (hotelFields) {
+        extensionsUI.name = stripNulls(hotelFields.name ?? '');
+        extensionsUI.address = stripNulls(hotelFields.address ?? '');
+        extensionsUI.checkinTime = minutesToHHMM(hotelFields.checkinTimeMin);
+        extensionsUI.checkoutTime = minutesToHHMM(hotelFields.checkoutTimeMin);
+        extensionsUI.roomNumber = stripNulls(hotelFields.roomNumber ?? '');
+    }
+  }
+}
+
+ // Need to add fields to the DB reminder row specific to the UI card
+ // Sets temporary fields to saved values from DB
+  const UIReminder = {
+    // Copy all fields from DB shared type 
+    ...row,
+    // Give generated their own unique IDs (different from parent series in frontend for UI functionality and prevent duplicate issues)
+    // UI ID is a combination of itemID bigint with the generated reminders original event date
+    itemID: BigInt(`${row.itemID}${row.origEventStartYear}${row.origEventStartDay}${row.origEventStartMin}`),
+    folderID: (typeof row.folderID === 'bigint') ? row.folderID : BigInt(row.folderID),
+    temporaryFolderID: row.folderID == null ? null : ((typeof row.folderID === 'bigint') ? row.folderID : BigInt(row.folderID)),
+    // Generated do not have lastModified field, set to current time for storage
+    lastModified: BigInt(Date.now()),
+    // Add on UI specific fields
+    temporaryTitle: row.title ?? '',
+    extension: extensionsUI,
+    // Normal reminders have no recurrence type
+    originalRecurrenceType: null,
+    temporaryEventStartTime: startStr,
+    temporaryEventEndTime: endStr,
+    temporaryEventEndDay: normalizeDatePickerToCalendar(endDateString) ?? dateString, // Default end day is same as start day (not multi-day)
+    temporaryEventEndDateEnabled: false, // Generated are not multi-day (as series doesn't support it fully)
+    temporaryNotificationTime: minutesBeforeStartTime,
+    temporaryLastModified: '',
+    date: normalizeDatePickerToCalendar(dateString) ?? dateString,
+    titleMessageError: '',
+    folderMessageError: '',
+    timeMessageError: '',
+    isSaved: true,
+    isEditing: false,
+    isSelected: false,
+    isRecurring: false,
+    isConverting: false,
+    isGenerated: true,
+    // Generated itemIDs are the parent series ID, store it to link back to parent series
+    linkedParentSeriesID: (typeof row.itemID === 'bigint') ? row.itemID : BigInt(row.itemID),
+    expanded: true
+  } as UIReminder;
+
+  // If true, update (if existing) or insert (if not) UI reminder into global reminders array
+  if (upsert) {
+    // Compute index for a reminder for card display, use itemID as unique index
+    // Look for existing reminder in reminders array that matches the itemID of the converted reminder
+    const index = reminders.value.findIndex(reminder => String(reminder.itemID) === String(UIReminder.itemID));
+    if (index >= 0) {
+    // If found, replace preexisting reminder in array with new UI object
+    reminders.value[index] = UIReminder;
+  } else {
+    // If not found, add new UI object reminder to the array
+    reminders.value.push(UIReminder);
+  }
+}
+  return UIReminder;
+}
+
 
 
 // Map a DB recurring reminder row into the UI reminder shape needed for card display
@@ -2309,6 +2551,8 @@ function mapDBSeriesToUIRecurringReminder(row: DailyReminder | WeeklyReminder | 
     recurrence: recurrence,
     isRecurring: true,
     isConverting: false,
+    isGenerated: false,
+    linkedParentSeriesID: null,
     expanded: true
   } as UIReminder;
 
@@ -2438,6 +2682,8 @@ onMounted(async () => {
   await loadRemindersForCalendarDate(selectedDate.value);
   // Load reminders for the visible month for calendar events
   await loadRemindersForMonth(selectedDate.value);
+  // Load generated reminders for visible and next month
+  await loadGeneratedReminders(selectedDate.value);
   // Since sync initiates on startup, set cloud toggle to on
   isCloudOn.value = true;
   // Start initial sync on app load
@@ -2715,6 +2961,9 @@ async function saveDailyReminder(reminder: UIReminder, extensionsToSend: Extensi
       mapDBSeriesToUIRecurringReminder(row, 'daily', true);
     }
 
+    // Reload generated reminders after new series creation to immediately show new items
+    await loadGeneratedReminders(selectedDate.value);
+
     // Load folders after creation
     folders.value = mapDBToUIFolder(await readAllFolders());
     reminder.timeMessageError = '';
@@ -2734,6 +2983,9 @@ async function saveDailyReminder(reminder: UIReminder, extensionsToSend: Extensi
         mapDBSeriesToUIRecurringReminder(row, 'daily', true);
       }
 
+     // Reload generated reminders after new series update to immediately show updated items
+     await loadGeneratedReminders(selectedDate.value);
+
       folders.value = mapDBToUIFolder(await readAllFolders());
       reminder.timeMessageError = '';
       return true;
@@ -2751,6 +3003,9 @@ async function saveDailyReminder(reminder: UIReminder, extensionsToSend: Extensi
 
       // Remove old normal reminder from UI
       reminders.value = reminders.value.filter(r => String(r.itemID) !== String(reminder.itemID));
+
+      // Reload generated reminders after new series creation to immediately show new items
+      await loadGeneratedReminders(selectedDate.value);
 
       folders.value = mapDBToUIFolder(await readAllFolders());
       await loadRemindersForCalendarDate(selectedDate.value);
@@ -2863,6 +3118,9 @@ async function saveWeeklyReminder(reminder: UIReminder, extensionsToSend: Extens
       mapDBSeriesToUIRecurringReminder(row, 'weekly', true);
     }
 
+    // Reload generated reminders after new series creation to immediately show new items
+    await loadGeneratedReminders(selectedDate.value);
+
     // Load folders after creation
     folders.value = mapDBToUIFolder(await readAllFolders());
     reminder.timeMessageError = '';
@@ -2882,6 +3140,9 @@ async function saveWeeklyReminder(reminder: UIReminder, extensionsToSend: Extens
         mapDBSeriesToUIRecurringReminder(row, 'weekly', true);
       }
 
+      // Reload generated reminders after new series update to immediately show updated items
+      await loadGeneratedReminders(selectedDate.value);
+
       folders.value = mapDBToUIFolder(await readAllFolders());
       reminder.timeMessageError = '';
       return true;
@@ -2899,6 +3160,9 @@ async function saveWeeklyReminder(reminder: UIReminder, extensionsToSend: Extens
 
       // Remove old normal reminder from UI
       reminders.value = reminders.value.filter(r => String(r.itemID) !== String(reminder.itemID));
+
+      // Reload generated reminders after new series creation to immediately show new items
+      await loadGeneratedReminders(selectedDate.value);
 
       folders.value = mapDBToUIFolder(await readAllFolders());
       await loadRemindersForCalendarDate(selectedDate.value);
@@ -3005,6 +3269,9 @@ async function saveMonthlyReminder(reminder: UIReminder, extensionsToSend: Exten
       mapDBSeriesToUIRecurringReminder(row, 'monthly', true);
     }
 
+    // Reload generated reminders after new series update to immediately show updated items
+    await loadGeneratedReminders(selectedDate.value);
+
     folders.value = mapDBToUIFolder(await readAllFolders());
     reminder.timeMessageError = '';
     return true;
@@ -3023,6 +3290,9 @@ async function saveMonthlyReminder(reminder: UIReminder, extensionsToSend: Exten
       if (row) {
         mapDBSeriesToUIRecurringReminder(row, 'monthly', true);
       }
+
+      // Reload generated reminders after new series creation to immediately show new items
+      await loadGeneratedReminders(selectedDate.value);
 
       folders.value = mapDBToUIFolder(await readAllFolders());
       reminder.timeMessageError = '';
@@ -3044,6 +3314,9 @@ async function saveMonthlyReminder(reminder: UIReminder, extensionsToSend: Exten
 
       // Remove old normal reminder from UI list
       reminders.value = reminders.value.filter(r => String(r.itemID) !== String(reminder.itemID));
+
+      // Reload generated reminders after new series creation to immediately show new items
+      await loadGeneratedReminders(selectedDate.value);
       // Map recurring reminder to UI format
       folders.value = mapDBToUIFolder(await readAllFolders());
       await loadRemindersForCalendarDate(selectedDate.value);
@@ -3134,6 +3407,9 @@ async function saveYearlyReminder(reminder: UIReminder, extensionsToSend: Extens
       mapDBSeriesToUIRecurringReminder(row, 'yearly', true);
     }
 
+     // Reload generated reminders after new series creation to immediately show new items
+     await loadGeneratedReminders(selectedDate.value);
+
     folders.value = mapDBToUIFolder(await readAllFolders());
     reminder.timeMessageError = '';
     return true;
@@ -3150,6 +3426,8 @@ async function saveYearlyReminder(reminder: UIReminder, extensionsToSend: Extens
         mapDBSeriesToUIRecurringReminder(row, 'yearly', true);
       }
 
+      // Reload generated reminders after updated series creation to immediately show updated items
+      await loadGeneratedReminders(selectedDate.value);
       folders.value = mapDBToUIFolder(await readAllFolders());
       reminder.timeMessageError = '';
       return true;
@@ -3166,6 +3444,9 @@ async function saveYearlyReminder(reminder: UIReminder, extensionsToSend: Extens
 
       // Remove old normal reminder from UI list
       reminders.value = reminders.value.filter(r => String(r.itemID) !== String(reminder.itemID));
+
+      // Reload generated reminders after new series creation to immediately show new items
+      await loadGeneratedReminders(selectedDate.value);
       // Map recurring reminder to UI format
       folders.value = mapDBToUIFolder(await readAllFolders());
       await loadRemindersForCalendarDate(selectedDate.value);
@@ -3455,12 +3736,17 @@ async function deleteRecurringReminderSeries(reminder: UIReminder) {
     // Deleting a series automatically deletes all its generated reminders 
     if (reminder.recurrence.type === 'daily') {
      await deleteItem(reminder.itemID, 21);
+     // Reload generated reminders after new series deletion to immediately show items gone
+     await loadGeneratedReminders(selectedDate.value);
    } else if (reminder.recurrence.type === 'weekly') {
      await deleteItem(reminder.itemID, 22);
+     await loadGeneratedReminders(selectedDate.value);
    } else if (reminder.recurrence.type === 'monthly') {
      await deleteItem(reminder.itemID, 23);
+     await loadGeneratedReminders(selectedDate.value);
    } else if (reminder.recurrence.type === 'yearly') {
      await deleteItem(reminder.itemID, 24);
+     await loadGeneratedReminders(selectedDate.value);
    } else {
     // Not a valid recurrence type
      return;
@@ -3746,6 +4032,7 @@ const filteredReminders = computed(() => {
 watch(selectedDate, async (newDate) => {
   // Load reminders for newly selected calendar date
   await loadRemindersForCalendarDate(newDate);
+  await loadGeneratedReminders(newDate);
 });
 
 // Create events on calendar from reminders
@@ -3846,10 +4133,12 @@ function onNext() {
 async function onMoved(data: Timestamp) {
   console.log('qcalendar onMoved payload:', data);
   await loadRemindersForMonth(selectedDate.value);
+  await loadGeneratedReminders(selectedDate.value);
 }
 async function onChange(data: Timestamp) {
   console.log('qcalendar onChange payload:', data);
   await loadRemindersForMonth(selectedDate.value);
+  await loadGeneratedReminders(selectedDate.value);
 }
 
 function onClickDate(data: Timestamp) {

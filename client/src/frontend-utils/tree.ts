@@ -1,7 +1,7 @@
 /*
  * Authors: Rachel Patella
  * Created: 2025-10-23
- * Updated: 2025-10-29
+ * Updated: 2025-11-24
  *
  * This file contains functions to create the file explorer tree structure and breadcrumb trail path
  *
@@ -51,7 +51,8 @@ export function convertFolderTreetoQTree(folders: UIFolder[], notes: UINote[], r
     });
 
     // Find reminders saved in the current folder
-    const remindersInCurrFolder = reminders.filter(reminder => reminder.folderID === folder.folderID && reminder.isSaved);
+    // Do not show generated in file explorer
+    const remindersInCurrFolder = reminders.filter(reminder => reminder.folderID === folder.folderID && reminder.isSaved && !reminder.isGenerated);
 
     // For each reminder, create a QTree node with label and id properties and return it
     const reminderTreeNodes = remindersInCurrFolder.map((reminder) => {
@@ -95,7 +96,7 @@ export function buildRootNodes(folders: UIFolder[],notes: UINote[], reminders: U
     id: -note.itemID,
   }));
 
-  const reminderRootNodes = reminders.filter(reminder => reminder.isSaved && reminder.folderID === 0n).
+  const reminderRootNodes = reminders.filter(reminder => reminder.isSaved && reminder.folderID === 0n && !reminder.isGenerated).
   map(reminder => ({
     label: reminder.title,
     icon: 'alarm',

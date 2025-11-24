@@ -57,6 +57,10 @@ export type UIReminder = Reminder & {
   isSelected: boolean;
   // Used to see saved reminder in list while user toggles recurrence
   isConverting: boolean;
+  isGenerated: boolean;
+  // Parent recurring series ID for generated instances
+  linkedParentSeriesID: bigint | null;
+  // Carat open/close                                                       
   expanded: boolean;
   temporaryEventEndDateEnabled: boolean;
   // UI-only date field - calendar date selected for the reminder

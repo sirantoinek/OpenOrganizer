@@ -875,7 +875,7 @@
                   <q-btn class="login-register-button" style="font-size: 15px; margin-right: 10px" flat label="Save" @click="saveReminder(item)"></q-btn>
                   <q-btn v-if="!item.isGenerated" class="login-register-button" style="background-color: grey; font-size: 15px" flat label="Cancel" @click="cancelReminder(item)"></q-btn>
                   <q-btn v-if="item.isGenerated" class="login-register-button" style="font-size: 15px" flat label="View Series" @click="showParentSeriesFromGeneratedReminder(item)"></q-btn>
-                  <q-btn v-if="item.isRecurring && previousListState && String(previousListState.parentSeriesID) === String(item.itemID)" class="login-register-button" style="background-color: grey; font-size: 15px" flat label="View Generated" @click="showGeneratedReminderFromParentSeries()"></q-btn>
+                  <q-btn v-if="item.isRecurring && previousListState && String(previousListState.parentSeriesID) === String(item.itemID)" class="login-register-button" style="background-color: grey; font-size: 15px; margin-left: 10px;"  flat label="View Generated" @click="showGeneratedReminderFromParentSeries()"></q-btn>
                 </div>
               </q-card-section>
             </q-expansion-item>

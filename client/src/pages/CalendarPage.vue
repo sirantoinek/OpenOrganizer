@@ -947,9 +947,9 @@
 
 <script setup lang="ts">
 // Imports
-import {QCalendarMonth, addToDate, parseTimestamp, today, isLeapYear, type Timestamp} from '@quasar/quasar-ui-qcalendar';
+import { QCalendarMonth, addToDate, parseTimestamp, today, isLeapYear, type Timestamp } from '@quasar/quasar-ui-qcalendar';
 import '@quasar/quasar-ui-qcalendar/index.css';
-import {buildCalendarEvents, groupEventsByDate, getEventTypeColor, getEventTypeFields, getEventStartLabel, stripNulls, getEventEndLabel, type EventType, type CalendarEvent} from '../frontend-utils/events';
+import { buildCalendarEvents, groupEventsByDate, getEventTypeColor, getEventTypeFields, getEventStartLabel, stripNulls, getEventEndLabel, type EventType, type CalendarEvent } from '../frontend-utils/events';
 import { buildBreadcrumbs, normalizeFolderID, buildRootNodes} from '../frontend-utils/tree';
 import { convertTimeAndDateToTimestamp, convertNotificationTimestamp, minutesToHHMM, timeStamptoEpoch, normalizeDatePickerToCalendar, eventDatetoLocaleString, endDateRange, endDateRangeRecurring } from '../frontend-utils/time';
 import { ref, computed, watch, onMounted } from 'vue';
@@ -958,7 +958,7 @@ import type { Reminder, DailyReminder, WeeklyReminder, MonthlyReminder, YearlyRe
 import {createNote, createReminder, createDailyReminder, createWeeklyReminder, createMonthlyReminder, createYearlyReminder, createOrUpdateOverride, createFolder, createRootFolder,
   readNote, readNotesInRange, readReminder, readDailyReminder, readWeeklyReminder, readMonthlyReminder, readYearlyReminder, readRemindersInRange, readDailyRemindersInRange, readWeeklyRemindersInRange, readMonthlyRemindersInRange, readYearlyRemindersInRange, readGeneratedRemindersInRange, readAllFolders, 
   updateNote, updateReminder, updateDailyReminder, updateWeeklyReminder, updateMonthlyReminder, updateYearlyReminder, updateFolder, 
-  deleteItem, deleteFolder} from '../utils/local-db';
+  deleteItem, deleteFolder } from '../utils/local-db';
 import { FieldsToFlight, FieldsToHotel, FlightToExtensions, HotelToExtensions, ExtensionsToFlight, ExtensionsToHotel } from '../utils/eventtypes';
 import { useQuasar } from 'quasar';
 import { useRouter } from 'vue-router';
@@ -2187,6 +2187,7 @@ function mapDBToUIReminder(row: Reminder, upsert: boolean): UIReminder {
     extension: extensionsUI,
     // Normal reminders have no recurrence type
     originalRecurrenceType: null,
+    originalGeneratedTimestamp: null,
     temporaryEventStartTime: startStr,
     temporaryEventEndTime: endStr,
     temporaryEventEndDay: normalizeDatePickerToCalendar(endDateString) ?? dateString, // Default end day is same as start day (not multi-day)
@@ -2256,6 +2257,19 @@ function mapDBGeneratedToUIReminder(row: GeneratedReminder, upsert: boolean): UI
   const eventEndMinute = endMinuteOfDay % 60;
   endDate.setHours(eventEndHour, eventEndMinute, 0, 0);
   const endDateString = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`;
+
+
+  // Create a timestamp from original DB year, day, min to use in overrides
+  const originalMinuteOfDay = Number(row.origEventStartMin);
+  const originalDay = Number(row.origEventStartDay);
+  const originalYear = Number(row.origEventStartYear);
+  const originalDate = new Date(originalYear, 0, 1);
+  originalDate.setDate(originalDate.getDate() + (originalDay - 1));
+  const origTimeString = minutesToHHMM(originalMinuteOfDay);
+  const origDateString = `${originalDate.getFullYear()}-${String(originalDate.getMonth() + 1).padStart(2, '0')}-${String(originalDate.getDate()).padStart(2, '0')}`;
+  // Convert date to timestamp
+  const originalTimestamp = convertTimeAndDateToTimestamp(origDateString, origTimeString);
+
 
   // UI reminder extension fields as a record, these are the actual values taken from frontend input fields 
   const extensionsUI = {} as Record<string, string | number | null | undefined>;
@@ -2333,6 +2347,7 @@ function mapDBGeneratedToUIReminder(row: GeneratedReminder, upsert: boolean): UI
     extension: extensionsUI,
     // Normal reminders have no recurrence type
     originalRecurrenceType: null,
+    originalGeneratedTimestamp: originalTimestamp,
     temporaryEventStartTime: startStr,
     temporaryEventEndTime: endStr,
     temporaryEventEndDay: normalizeDatePickerToCalendar(endDateString) ?? dateString, // Default end day is same as start day (not multi-day)
@@ -2568,6 +2583,7 @@ function mapDBSeriesToUIRecurringReminder(row: DailyReminder | WeeklyReminder | 
     extension: extensionsUI,
     // Get recurrence type from DB row loaded into the UI
     originalRecurrenceType: recurrence?.type ?? recurrenceType,
+    originalGeneratedTimestamp: null,
     // Event start time, end time, end day, end date are all unique to non-recurring reminders, override these fields for recurring 
     temporaryEventStartTime: '',
     temporaryEventEndTime: '',
@@ -2585,7 +2601,6 @@ function mapDBSeriesToUIRecurringReminder(row: DailyReminder | WeeklyReminder | 
     notifDay: 0,
     notifMin: 0,
     hasNotif: row.hasNotifs,
-
     temporaryLastModified: lastModifiedTimeAndDate,
     date: normalizeDatePickerToCalendar(dateString) ?? dateString,
     titleMessageError: '',
@@ -3539,6 +3554,12 @@ async function saveReminder(reminder: UIReminder){
     return;
   }
 
+  // Reminder is generated, create/update an override on save
+  if (reminder.isGenerated) {
+    await saveGeneratedReminder(reminder);
+    return;
+  }
+
   // If recurring reminder returned false by failing validation, stop
    if (!recurringReminder && reminder.timeMessageError) {
    return;
@@ -3742,6 +3763,42 @@ try {
   }
   } catch (error) {
     console.error('Error adding reminder:', error);
+  }
+}
+
+// Function to create or update an override when generated reminder is saved
+async function saveGeneratedReminder(generatedReminder: UIReminder) {
+  try {
+    // Not a generated reminder
+    if (!generatedReminder || !generatedReminder.isGenerated || !generatedReminder.linkedParentSeriesID
+    ) {
+      return;
+    }
+
+    const originalStartTimestamp = generatedReminder.originalGeneratedTimestamp;
+    if (!originalStartTimestamp) {
+      return;
+    }
+
+    // Create newly edited generated fields from UI fields (event start/end time, notifTime, and hasNotif)
+    // Keep time on same day as the generated reminder date
+    const eventStartTime = convertTimeAndDateToTimestamp(generatedReminder.date, generatedReminder.temporaryEventStartTime ?? '00:00');
+    const eventEndTime = convertTimeAndDateToTimestamp(generatedReminder.date, generatedReminder.temporaryEventEndTime ?? '00:00');
+
+    // Use notification offset
+    const notifOffsetMin = generatedReminder.temporaryNotificationTime;
+    const hasNotif = notifOffsetMin != null;
+    const notifTimestamp = hasNotif
+      ? convertNotificationTimestamp(generatedReminder.date, generatedReminder.temporaryEventStartTime ?? '00:00', Number(generatedReminder.temporaryNotificationTime))
+      : eventStartTime; // Placeholder if no notification
+
+    // Create override
+    await createOrUpdateOverride(generatedReminder.linkedParentSeriesID, originalStartTimestamp, eventStartTime, eventEndTime, notifTimestamp, hasNotif);
+    // Reload generated reminders to show updated fields
+    await loadGeneratedReminders(selectedDate.value);
+
+  } catch (error) {
+    console.error('Error saving generated reminder override:', error);
   }
 }
 

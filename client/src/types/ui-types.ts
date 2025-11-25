@@ -12,6 +12,7 @@
  */
 
 import type { Note, Reminder, Folder } from '../../src-electron/types/shared-types'; 
+import { type Timestamp } from '@quasar/quasar-ui-qcalendar';
 
 // UI types extend client backend/shared-types model with UI-only fields for use in renderer
 // Some fields can change in the UI (ex. folderID null until user selects a folder), but are set in stone for backend DB
@@ -58,6 +59,8 @@ export type UIReminder = Reminder & {
   // Used to see saved reminder in list while user toggles recurrence
   isConverting: boolean;
   isGenerated: boolean;
+  // Used in overrides to track original timestamp
+  originalGeneratedTimestamp: Timestamp | null;
   // Parent recurring series ID for generated instances
   linkedParentSeriesID: bigint | null;
   // Carat open/close                                                       

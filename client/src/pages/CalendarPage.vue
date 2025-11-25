@@ -1,7 +1,7 @@
 <!--
  * Authors: Rachel Patella, Maria Pasaylo, Michael Jagiello
  * Created: 2025-09-22
- * Updated: 2025-11-24
+ * Updated: 2025-11-25
  *
  * This file is the main home page that includes the calendar view, notes/reminders list, 
  * and a file explorer as a 3 column grid layout.
@@ -180,7 +180,21 @@
           </template>
         </q-tree>
         <div style="display: flex; flex-wrap: wrap; align-items: center; margin-top: auto; gap: 4px;">
-          <q-btn style="font-size: 0.9rem; color: #474747;" flat  icon="add"  label="Add" @click="addFolder()" />
+          <q-btn style="font-size: 0.9rem; color: #474747;" flat  icon="add"  label="Add">
+          <q-menu>
+          <q-list style="min-width: 100px">
+            <q-item @click= addExplorerReminder(); clickable v-close-popup>
+              <q-item-section>Reminder</q-item-section>
+            </q-item>
+            <q-item @click = addExplorerNote(); clickable v-close-popup>
+              <q-item-section>Note</q-item-section>
+            </q-item>
+              <q-item @click= addFolder(); clickable v-close-popup>
+              <q-item-section>Folder</q-item-section>
+            </q-item>
+            </q-list>
+          </q-menu>
+        </q-btn>
           <q-btn style="font-size: 0.9rem; color: #474747;" flat  icon="delete"  label="Delete" @click="deleteTreeNode()" />
           <q-btn style="font-size: 0.9rem; color: #474747;" flat  icon="edit"  label="Rename" @click="renameTreeNode()" />
         </div>
@@ -616,6 +630,8 @@
                     class="flight-half"
                     maxlength="3"
                   />
+                  <!--Extension times are only shown for normal/generated reminders, recurring uses tiemOfDayMin and eventDuration -->
+                  <template v-if="!item.isRecurring && !item.isGenerated">
                   <q-input
                     v-model="item.extension.depTime"
                     label="Departure Time"
@@ -632,6 +648,25 @@
                     dense
                     class="flight-half"
                   />
+                  </template>
+                  <template v-if="item.isGenerated">
+                  <q-input
+                  v-model="item.temporaryEventStartTime"
+                  label="Departure Time"
+                  type="time"
+                  outlined
+                  dense
+                  class="flight-half"
+                  />
+                  <q-input
+                  v-model="item.temporaryEventEndTime"
+                  label="Arrival Time"
+                  type="time"
+                  outlined
+                  dense
+                  class="flight-half"
+                  />
+                  </template>
                   <div v-if="item.temporaryEventEndDateEnabled" style="width:100%; grid-column: 1 / -1;">
                     <q-input
                       v-model="item.temporaryEventEndDay"
@@ -741,6 +776,7 @@
                 class="flight-full"
                 maxlength="10"
                 />
+                <template v-if="!item.isRecurring && !item.isGenerated">
                 <q-input 
                 v-model="item.extension.checkinTime" 
                 label="Check-in time" 
@@ -757,6 +793,25 @@
                 dense 
                 class="flight-half"
                 />
+                </template>
+                <template v-if="item.isGenerated">
+                <q-input
+                v-model="item.temporaryEventStartTime"
+                label="Check-in Time"
+                type="time"
+                outlined
+                dense
+                class="flight-half"
+                />
+                <q-input
+                v-model="item.temporaryEventEndTime"
+                label="Check-out Time"
+                type="time"
+                outlined
+                dense
+                class="flight-half"
+                />
+                </template>
                 <div v-if="item.temporaryEventEndDateEnabled" style="width:100%; grid-column: 1 / -1;">
                   <q-input
                     outlined
@@ -818,7 +873,7 @@
               </div>
                 <div class="row" style="display:flex; flex-wrap:wrap; align-items:center">
                   <q-btn class="login-register-button" style="font-size: 15px; margin-right: 10px" flat label="Save" @click="saveReminder(item)"></q-btn>
-                  <q-btn class="login-register-button" style="background-color: grey; font-size: 15px" flat label="Cancel" @click="cancelReminder(item)"></q-btn>
+                  <q-btn v-if="!item.isGenerated" class="login-register-button" style="background-color: grey; font-size: 15px" flat label="Cancel" @click="cancelReminder(item)"></q-btn>
                   <q-btn v-if="item.isGenerated" class="login-register-button" style="font-size: 15px" flat label="View Series" @click="showParentSeriesFromGeneratedReminder(item)"></q-btn>
                   <q-btn v-if="item.isRecurring && previousListState && String(previousListState.parentSeriesID) === String(item.itemID)" class="login-register-button" style="background-color: grey; font-size: 15px" flat label="View Generated" @click="showGeneratedReminderFromParentSeries()"></q-btn>
                 </div>
@@ -880,7 +935,7 @@
     <div style="grid-area: calendar; padding: 20px" data-area="calendar">
       <div style="display: flex; justify-content: center">
         <div style="
-            max-width: 400px;
+            max-width: 500px;
             width: 100%;
             display: flex;
             flex-direction: column;
@@ -903,17 +958,17 @@
             </div>
           </div>
           <div style="display: flex; justify-content: center; align-items: center;">
-            <div style="display: flex; max-width: 500px; width: 100%; flex-direction: column;"> 
+            <div style="display: flex; max-width: 600px; width: 100%; flex-direction: column;"> 
               <q-calendar-month ref="calendar" v-model="selectedDate" mini-mode hoverable focusable
-                :focus-type="['date', 'weekday']" :min-weeks="6" animated @change="onChange" @moved="onMoved"
+                :focus-type="['date', 'weekday']" :min-weeks="6" animated 
                 @click-date="onClickDate" @click-day="onClickDay" @click-workweek="onClickWorkweek"
                 @click-head-workweek="onClickHeadWorkweek" @click-head-day="onClickHeadDay" style="height: 400px;" >
                 <template #day="{ scope: { timestamp } }">
-                <div style="display: flex; flex-direction: column; gap: 3px; padding: 2px; align-items: center; justify-content: center;">
+                <div style="display: flex; flex-direction: row; gap: 3px; padding: 2px; align-items: center; justify-content: center; overflow:hidden; max-height: 24px;">
               <template v-for="event in eventsMap[timestamp.date]" :key="String(event.id)">
                 <div
                 :class="`bg-${event.color}`"
-                style="width: 8px; height: 8px; border-radius: 50%; cursor: pointer;"
+                style="width: 8px; height: 8px; border-radius: 50%; cursor: pointer; flex-shrink: 0;"
                 @click="onClickCalendarEvent(event)"
               >
                 <!-- Tooltip on hover to clarify if event start or end -->
@@ -992,11 +1047,11 @@ const filteredReminders = computed(() => {
   // Search functionality example: https://stackoverflow.com/questions/74670957/how-to-display-search-results-using-react-typescript
   const query = (searchQuery.value ?? '').trim().toLowerCase();
 
-  // By default, middle list only shows normal reminders and recurring drafts (or saved reminders being converted to recurring)
+  // By default, middle list only shows normal reminders, generated reminders, and recurring drafts (or saved reminders being converted to recurring)
   const defaultReminderList = reminders.value.filter(reminder => !reminder.isRecurring || !reminder.isSaved || reminder.isConverting);
 
  // No search query, either show recurring reminder if selected on file explorer
- // Or show default list otherwise (normal reminders and recurring drafts)
+ // Or show default list otherwise (normal reminders, generated reminders, and recurring drafts)
   if (!searchQuery.value) {
     if (selectedFolderID.value !== null && selectedFolderID.value < 0n) {
       const selectedNode = -selectedFolderID.value;
@@ -1011,7 +1066,7 @@ const filteredReminders = computed(() => {
     }
   }
 
-  // Otherwise, if search query is provided, only search normal reminders and recurring drafts (default list) by title
+  // Otherwise, if search query is provided, only search normal reminders, generated reminders, and recurring drafts (default list) by title
   return defaultReminderList.filter(reminder => {
     // Check for reminders entries where the title is in the search query
     const matchesQuery = String(reminder.temporaryTitle ?? '').toLowerCase().includes(query) || String(reminder.title ?? '').toLowerCase().includes(query);
@@ -1270,7 +1325,43 @@ const eventTypes: EventType[] = [
       }
     }
 
-    // Check if arrTime or checkOut time exist
+    // If reminder is recurring and field is empty (intended as times are hidden), use recurrence timeOfDayMin (Start/Departure/Check-in time) and eventDuration (to compute End/Arrival/Check-out time)
+    if (reminder.isRecurring && reminder.recurrence) {
+     let minOfDay: number = 0;
+     let eventDuration: number = 0;
+
+     if (reminder.recurrence.type === 'daily' && reminder.recurrence.daily) {
+      minOfDay = reminder.recurrence.daily.timeOfDayMin;
+      eventDuration = reminder.recurrence.daily.eventDurationMin;
+     }
+     else if (reminder.recurrence.type === 'weekly' && reminder.recurrence.weekly) {
+      minOfDay = reminder.recurrence.weekly.timeOfDayMin;
+      eventDuration = reminder.recurrence.weekly.eventDurationMin;
+     }
+     else if (reminder.recurrence.type === 'monthly' && reminder.recurrence.monthly) {
+      minOfDay = reminder.recurrence.monthly.timeOfDayMin;
+      eventDuration = reminder.recurrence.monthly.eventDurationMin;
+     }
+     else if (reminder.recurrence.type === 'yearly' && reminder.recurrence.yearly) {
+      minOfDay = reminder.recurrence.yearly.timeOfDayMin;
+      eventDuration = reminder.recurrence.yearly.eventDurationMin;
+     }
+     // Convert timeOfDayMin from a number to a HH:MM string
+     const startString = minutesToHHMM(minOfDay);
+     // Compute end time from start time + event duration
+     const endMin = (minOfDay + eventDuration) % 1440;
+     const endString = minutesToHHMM(endMin);
+     // Set extension times to start and end recurrence times if the fields exist
+     if (fieldKey === 'depTime' || fieldKey === 'checkinTime') {
+      return convertTimeAndDateToTimestamp(reminder.date, startString) ?? undefined;
+     }
+     else if (fieldKey === 'arrTime' || fieldKey === 'checkoutTime') {
+      // Use event end day for multi-day events and event start day for single day events
+      return convertTimeAndDateToTimestamp(eventEndDay, endString) ?? undefined;
+     }
+    }
+        
+    // Check if arrTime or checkOut time exist and reminder is normal/non-recurring
     if (fieldKey === 'arrTime' || fieldKey === 'checkoutTime') {
       // If arrival time (end) is the key field, see if departure time (start) exists in record
       // Otherwise if check out time (end) is the key field, see if check in time (start) exists in record
@@ -1330,7 +1421,6 @@ const eventTypes: EventType[] = [
 
       // Fields are provided and validated, build extension to save
       const exts = FlightToExtensions(flightFields) ?? [];
-      // console.log('PACKER final packed extensions (to be saved):', exts);
       return exts;
     }
       // Hotel
@@ -1397,11 +1487,10 @@ async function onToggleCloudSync() {
   try {
     await window.syncAPI.sync();
     syncStatusMessage.value = 'Cloud Synced Successfully';
-    console.log('Cloud sync completed successfully');
   } catch (error) {
     syncStatusMessage.value = 'Cloud Sync Failed';
     console.error('Error during cloud sync:', error);
-   // Incase of error, reset sync status
+   // Reset sync status for next time
   } finally {
     isSyncing.value = false;
   }
@@ -1695,7 +1784,7 @@ function cancelRename(item: UIReminder | UINote | UIFolder) {
   // Distinguish between folder and reminder/note by checking for unique property
   // Cancel renaming a folder
   if ('temporaryFolderName' in item) {
-    // Folder is a draft, remove from UI
+    // Folder is a draft, remove from UI and keep all other entries
     if (!item.isSaved) {
       folders.value = folders.value.filter(f => String(f.folderID) !== String(item.folderID));
       // Clear tree node selection
@@ -1796,15 +1885,15 @@ async function loadRemindersForCalendarDate(dateString: string) {
   const endOfDay = convertTimeAndDateToTimestamp(dateString, '23:59');
 
   try {
-    // Filter out any reminders already in list for that date to avoid duplicates
-    reminders.value = reminders.value.filter(reminder => reminder.isRecurring || reminder.date !== dateString);
+    // Filter out any normal reminders already in list for that date before loading from database to avoid duplicate display
+    // Therefore, remove any normal reminders and keep recurring and generated
+    reminders.value = reminders.value.filter(reminder => reminder.isRecurring || reminder.isGenerated || reminder.date !== dateString);
     // Read reminders for currently selected date from local DB
     const rows = await readRemindersInRange(startOfDay, endOfDay);
     // Convert each reminder in range from response to UI reminder format 
     for (const reminder of rows) {
       mapDBToUIReminder(reminder, true);
     }
-    // console.log('Reminders for date loaded successfully:');
   } catch (error) {
     console.error('Error loading reminders for date:', error);
   }
@@ -1850,8 +1939,8 @@ async function loadRemindersForMonth(dateString: string) {
   const endRange = convertTimeAndDateToTimestamp(lastDayString, '23:59');
 
   try {
-    // Reload monthReminders for calendar 
-    monthReminders.value = [];
+    // Clear normal reminders before loading from database for calendar, keep generated reminders
+    monthReminders.value = monthReminders.value.filter(reminder => reminder.isGenerated);
     const rows = await readRemindersInRange(startRange, endRange);
     const requestedYM = `${String(year).padStart(4,'0')}-${String(month).padStart(2,'0')}`;
     // Convert each reminder in range from response to UI reminder format 
@@ -1863,7 +1952,6 @@ async function loadRemindersForMonth(dateString: string) {
           // push into monthReminders so the calendar uses these events
           monthReminders.value.push(result);
         }
-        // console.log('Reminders for month successfully loaded:');
       }
     } catch (error) {
     console.error('Error loading reminders for month:', error);
@@ -1920,13 +2008,13 @@ async function loadGeneratedReminders(dateString: string) {
   const nextMonthEndRange = convertTimeAndDateToTimestamp(nextMonthLastDayString, '23:59');
 
   try {
-    // Clear existing generated reminders before reloading to avoid duplicates
+    // Clear existing generated reminders before reloading fresh ones from database to avoid duplicate display
+    // Therefore, keep items that are not generated and filter out generated ones
     reminders.value = reminders.value.filter(reminder => !reminder.isGenerated);
     monthReminders.value = monthReminders.value.filter(reminder => !reminder.isGenerated);
 
     // Read the viewable calendar month
     const currentMonthReminders = await readGeneratedRemindersInRange(startRange, endRange);
-    //console.log('Current month generated reminders from DB:', currentMonthReminders.length, currentMonthReminders); // DEBUG
     // Convert each generated reminder in range from response to UI reminder format 
     for (const generatedReminder of currentMonthReminders) {
       // Map to UI and push to middle list (reminders array)
@@ -1937,7 +2025,6 @@ async function loadGeneratedReminders(dateString: string) {
 
     // Read the next month after
     const nextMonthReminders = await readGeneratedRemindersInRange(nextMonthStartRange, nextMonthEndRange);
-    //console.log('Next month generated reminders from DB:', nextMonthReminders.length, nextMonthReminders); // DEBUG
     // Convert each generated reminder in range from response to UI reminder format
     for (const generatedReminder of nextMonthReminders) {
       // Map to UI and push to middle list (reminders array)
@@ -1968,7 +2055,6 @@ async function loadReminders(year?: number) {
     }
     // sort reminders alphabetically by title for tree 
     reminders.value.sort((a, b) => {return String(a.temporaryTitle ?? a.title ?? '').toLowerCase().localeCompare(String(b.temporaryTitle ?? b.title ?? '').toLowerCase());});
-    // console.log('All reminders loaded successfully:');
   } catch (error) {
     console.error('Error loading reminders:', error);
   }
@@ -2054,13 +2140,11 @@ async function addRootFolder() {
     const hasRootFolder = folders.some(folder => folder.parentFolderID === -1n || folder.folderID === 0n);
     if (!hasRootFolder) {
       await createRootFolder(-1);
-      console.log('Root folder created.', folders);
       // Refresh folder list after creating root folder
       await readAllFolders();
     }
     else {
       // Root folder already exists
-      //console.log('Root folder already exists.');
     }
   }
   catch (error) {
@@ -2142,7 +2226,6 @@ function mapDBToUIReminder(row: Reminder, upsert: boolean): UIReminder {
     // If a flight, extract flight fields
     if (row.eventType === 1) {
       const flightFields = ExtensionsToFlight(extensionsArr);
-      console.log('flightFields', flightFields, 'extensionsUI', extensionsUI);
       if (flightFields) {
         extensionsUI.depAirportName = stripNulls(flightFields.depAirportName ?? '');
         extensionsUI.depAirportAddress = stripNulls(flightFields.depAirportAddress ?? '');
@@ -2299,7 +2382,6 @@ function mapDBGeneratedToUIReminder(row: GeneratedReminder, upsert: boolean): UI
     // If a flight, extract flight fields
     if (row.eventType === 1) {
       const flightFields = ExtensionsToFlight(extensionsArr);
-      console.log('flightFields', flightFields, 'extensionsUI', extensionsUI);
       if (flightFields) {
         extensionsUI.depAirportName = stripNulls(flightFields.depAirportName ?? '');
         extensionsUI.depAirportAddress = stripNulls(flightFields.depAirportAddress ?? '');
@@ -2537,8 +2619,7 @@ function mapDBSeriesToUIRecurringReminder(row: DailyReminder | WeeklyReminder | 
   if (extensionsArr && extensionsArr.length > 0) {
     // If a flight, extract flight fields
     if (row.eventType === 1) {
-      const flightFields = ExtensionsToFlight(extensionsArr);
-      console.log('flightFields', flightFields, 'extensionsUI', extensionsUI);
+      const flightFields = ExtensionsToFlight(extensionsArr);;
       if (flightFields) {
         extensionsUI.depAirportName = stripNulls(flightFields.depAirportName ?? '');
         extensionsUI.depAirportAddress = stripNulls(flightFields.depAirportAddress ?? '');
@@ -2848,7 +2929,6 @@ async function saveNote(note: UINote){
  try {
   if (!note.isSaved) {
     const itemID = await createNote(note.temporaryFolderID, note.temporaryTitle, note.temporaryText);
-    console.log('Note successfully created:', itemID);
 
     // Give this new note the actual itemID assigned by the DB and mark it saved so future saves go to update
     note.itemID = itemID;
@@ -2865,7 +2945,6 @@ async function saveNote(note: UINote){
   }
   else {
       await updateNote(note.itemID, note.temporaryFolderID, note.temporaryTitle, note.temporaryText);
-      console.log('Note successfully updated:', note.itemID);
 
       // Map DB row into UI and update notes.value array
       const row = await readNote(note.itemID); 
@@ -2896,6 +2975,15 @@ async function saveRecurringReminder(reminder: UIReminder) {
   if (!reminder.recurrence || !reminder.isRecurring) {
     return false;
   }
+
+    // Clear extension fields for recurring series to ensure the times are built off recurrence rules (in case reminder was normal before)
+    reminder.extension = reminder.extension ?? {};
+    ['depTime','arrTime','checkinTime','checkoutTime','boardingTime'].forEach(fieldKey => {
+      if (fieldKey in reminder.extension) {
+        // Null will cause it to go to the recurrence check in buildExtensionsForEventType
+        reminder.extension[fieldKey] = null;
+      }
+    });
 
   // Build event type extensions from UI fields
   const extensions = buildExtensionsForEventType(reminder);
@@ -3062,7 +3150,7 @@ async function saveDailyReminder(reminder: UIReminder, extensionsToSend: Extensi
         mapDBSeriesToUIRecurringReminder(row, 'daily', true);
       }
 
-      // Remove old normal reminder from UI
+      // Remove old normal reminder from UI, keep all other entries
       reminders.value = reminders.value.filter(r => String(r.itemID) !== String(reminder.itemID));
 
       // Reload generated reminders after new series creation to immediately show new items
@@ -3219,7 +3307,7 @@ async function saveWeeklyReminder(reminder: UIReminder, extensionsToSend: Extens
         mapDBSeriesToUIRecurringReminder(row, 'weekly', true);
       }
 
-      // Remove old normal reminder from UI
+      // Remove old normal reminder from UI, keep all other entries
       reminders.value = reminders.value.filter(r => String(r.itemID) !== String(reminder.itemID));
 
       // Reload generated reminders after new series creation to immediately show new items
@@ -3373,7 +3461,7 @@ async function saveMonthlyReminder(reminder: UIReminder, extensionsToSend: Exten
         mapDBSeriesToUIRecurringReminder(row, 'monthly', true);
       }
 
-      // Remove old normal reminder from UI list
+      // Remove old normal reminder from UI, keep all other entries
       reminders.value = reminders.value.filter(r => String(r.itemID) !== String(reminder.itemID));
 
       // Reload generated reminders after new series creation to immediately show new items
@@ -3503,7 +3591,7 @@ async function saveYearlyReminder(reminder: UIReminder, extensionsToSend: Extens
         mapDBSeriesToUIRecurringReminder(row, 'yearly', true);
       }
 
-      // Remove old normal reminder from UI list
+      // Remove old normal reminder from UI, keep all other entries
       reminders.value = reminders.value.filter(r => String(r.itemID) !== String(reminder.itemID));
 
       // Reload generated reminders after new series creation to immediately show new items
@@ -3685,13 +3773,12 @@ try {
   const extensionsToSend = (extensions && extensions.length > 0) ? extensions : undefined;
   // Reminder is not yet saved (first time saving after clicking add), create reminder in DB
   if (!reminder.isSaved) {
-  //console.log('Saving reminder extensions:', extensions);
+
   // Create base reminder in local DB and retrieve the itemID assigned to it
   const itemID = await createReminder(reminder.temporaryFolderID, reminder.eventType, eventStartTime, eventEnd, notificationTimestampToSend, hasNotification, reminder.temporaryTitle, extensionsToSend);
 
   // Fetch the newly created reminder from the DB 
   const row = await readReminder(itemID);
-  // console.log('Read reminder extensions: readReminder row.extensions =', row?.extensions);
   
   // Map DB row into UI and update reminders.value array
   if (row) {
@@ -3728,6 +3815,8 @@ try {
           const itemID = await createReminder(reminder.temporaryFolderID, reminder.eventType, eventStartTime, eventEnd, notificationTimestampToSend, hasNotification, reminder.temporaryTitle, extensionsToSend);
           // Delete the recurring series (also deletes generated reminders)
           await deleteItem(reminder.itemID, tableID);
+          // Remove old series reminder from UI, keep all other entries
+          reminders.value = reminders.value.filter(r => String(r.itemID) !== String(reminder.itemID));
           // Fetch the newly created reminder from the DB 
           const row = await readReminder(itemID);
   
@@ -3741,10 +3830,12 @@ try {
 
       // Reload calendar month to include newly added reminder
       await loadRemindersForMonth(selectedDate.value);
+
+      // Reload generated reminders since old series was deleted
+      await loadGeneratedReminders(selectedDate.value);
     }
       // Reminder is a normal reminder, just update it in DB
       await updateReminder(reminder.itemID, reminder.temporaryFolderID, reminder.eventType, eventStartTime, eventEnd, notificationTimestampToSend, hasNotification, reminder.temporaryTitle, extensionsToSend);
-      console.log('Reminder updated successfully in DB.');
 
       // Fetch the newly created reminder from the DB 
       const row = await readReminder(reminder.itemID);
@@ -3805,12 +3896,16 @@ async function saveGeneratedReminder(generatedReminder: UIReminder) {
 // Function to delete selected individual checkbox reminders
 async function deleteReminder(reminder: UIReminder) {
   try {
+    // Checkbox deleting a draft removes it from UI and refreshes view
+    if (!reminder.isSaved) {  
+      // Remove draft reminder from UI
+      reminders.value = reminders.value.filter(r => String(r.itemID) !== String(reminder.itemID));
+      return;
+    }
     // Delete specific reminder from local DB
     await deleteItem(reminder.itemID, 12);
-    // Update reminders array to filter out deleted reminder
-    // Array only contains reminders where the itemID does not match the deleted reminder's itemID
-    reminders.value = reminders.value.filter(r => r.itemID !== reminder.itemID);
-    console.log('Reminder deleted successfully from DB.');
+    // Remove old reminder from UI, keep all other entries
+    reminders.value = reminders.value.filter(r => String(r.itemID) !== String(reminder.itemID));
     // Refresh folders for tree to remove deleted reminder
     folders.value = mapDBToUIFolder(await readAllFolders());
     // Reload reminders for calendar date after deleted reminder
@@ -3829,6 +3924,13 @@ async function deleteReminder(reminder: UIReminder) {
 // Function to delete selected recurring reminders
 async function deleteRecurringReminderSeries(reminder: UIReminder) {
   try {
+    // Checkbox deleting a draft removes it from UI and refreshes view
+    if (!reminder.isSaved) {  
+      // Remove draft reminder from UI, keep all other entries
+      reminders.value = reminders.value.filter(r => String(r.itemID) !== String(reminder.itemID));
+      return;
+    }
+
     // Validate that the reminder is recurring
     if (!reminder.recurrence || !reminder.isRecurring) {
       console.error('Reminder is not recurring:', reminder.itemID);
@@ -3856,7 +3958,7 @@ async function deleteRecurringReminderSeries(reminder: UIReminder) {
    }
     // Update reminders array to filter out deleted reminder
     // Array only contains reminders where the itemID does not match the deleted reminder's itemID
-    reminders.value = reminders.value.filter(r => r.itemID !== reminder.itemID);
+    reminders.value = reminders.value.filter(r => String(r.itemID) !== String(reminder.itemID));
    // Successful deletion, refresh file explorer
    folders.value = mapDBToUIFolder(await readAllFolders());
   } catch (error) {
@@ -3868,12 +3970,17 @@ async function deleteRecurringReminderSeries(reminder: UIReminder) {
 // Function to delete selected individual checkbox notes
 async function deleteNote(note: UINote) {
   try {
+    // Checkbox deleting a draft removes it from UI and refreshes view
+    if (!note.isSaved) {  
+      // Remove draft note from UI, keep all other entries
+      notes.value = notes.value.filter(r => String(r.itemID) !== String(note.itemID));
+      return;
+    }
     // Delete specific note from local DB
     await deleteItem(note.itemID, 11);
     // Update notes array to filter out deleted note
     // Array only contains notes where the itemID does not match the deleted note's itemID
     notes.value = notes.value.filter(n => n.itemID !== note.itemID);
-    console.log('Note deleted successfully from DB.');
     // Refresh folders for tree to remove deleted note
     folders.value = mapDBToUIFolder(await readAllFolders());
     // Re-load notes after deleted note
@@ -3957,16 +4064,25 @@ async function deleteTreeNode() {
     const reminderToDelete = reminders.value.find(reminder => String(reminder.itemID) === String(itemID));
     if (reminderToDelete) {
       try {
-        // Delete specific selected reminder from DB and refresh UI
-        await deleteItem(reminderToDelete.itemID, 12);
-        // Remove deleted reminder from reminders array for UI rendering
-        reminders.value = reminders.value.filter(reminder => String(reminder.itemID) !== String(reminderToDelete.itemID));
-        folders.value = mapDBToUIFolder(await readAllFolders());
-        await loadRemindersForCalendarDate(selectedDate.value);
-        // Delete from calendar
-        await loadRemindersForMonth(selectedDate.value);
-        // Clear tree node selection after deletion
-        selectedFolderID.value = null;
+        if (reminderToDelete.isRecurring) {
+          // If reminder is recurring, delete series and reload generated
+          await deleteRecurringReminderSeries(reminderToDelete);
+          // Clear tree node selection after deletion
+          selectedFolderID.value = null;
+          return;
+        }
+        else {
+          // Delete specific selected reminder from DB and refresh UI
+          await deleteItem(reminderToDelete.itemID, 12);
+          // Remove deleted reminder from reminders array for UI rendering
+          reminders.value = reminders.value.filter(reminder => String(reminder.itemID) !== String(reminderToDelete.itemID));
+          folders.value = mapDBToUIFolder(await readAllFolders());
+          await loadRemindersForCalendarDate(selectedDate.value);
+          // Delete from calendar
+          await loadRemindersForMonth(selectedDate.value);
+          // Clear tree node selection after deletion
+          selectedFolderID.value = null;
+        }
       } catch (error) {
         console.error('Error deleting reminder from DB:', error);
       }
@@ -3982,6 +4098,18 @@ async function addArrayItem() {
   } else if (tab.value === 'notes') {
     addNote();
   }
+}
+
+// Adds a new reminder draft from the file explorer add button
+function addExplorerReminder() {
+  tab.value = 'reminders';
+  addReminder();
+}
+
+// Adds a new note draft from the file explorer add button
+function addExplorerNote() {
+  tab.value = 'notes';
+  addNote();
 }
 
 // Toggles behavior of delete button. If on reminder tab, delete selected reminders from array. If on notes tab, delete selected notes from array.
@@ -4008,11 +4136,14 @@ async function deleteArrayItem() {
 
 // Reverts fields back to stored values from DB for a reminder when cancel button is clicked or remove draft
 async function cancelReminder(reminder: UIReminder) {
+  // No generated support for canceling (no function exists to read a single generated by ID because they share itemID with the parent series)
+  if (reminder && reminder.isGenerated) {
+    return;
+  }
   // Reminder is a draft, remove from list
   if (!reminder.isSaved) {
     reminders.value = reminders.value.filter(r => String(r.itemID) !== String(reminder.itemID));
-    // Reload list for selected calendar date
-    await loadRemindersForCalendarDate(selectedDate.value);
+    return;
   // Reminder is saved, revert temporary fields back to saved database values
   } else {
       // Reminder is recurring, cancel its fields back to saved DB state
@@ -4119,6 +4250,7 @@ watch(selectAll, (selectionVal) => {
 watch(selectedDate, async (newDate) => {
   // Load reminders for newly selected calendar date
   await loadRemindersForCalendarDate(newDate);
+  await loadRemindersForMonth(newDate);
   await loadGeneratedReminders(newDate);
 });
 
@@ -4180,16 +4312,14 @@ function onNext() {
 }
 
 // Show reminders for current calendar month
-async function onMoved(data: Timestamp) {
-  console.log('qcalendar onMoved payload:', data);
-  await loadRemindersForMonth(selectedDate.value);
-  await loadGeneratedReminders(selectedDate.value);
-}
-async function onChange(data: Timestamp) {
-  console.log('qcalendar onChange payload:', data);
-  await loadRemindersForMonth(selectedDate.value);
-  await loadGeneratedReminders(selectedDate.value);
-}
+//async function onMoved(data: Timestamp) {
+ // await loadRemindersForMonth(selectedDate.value);
+ //await loadGeneratedReminders(selectedDate.value);
+//}
+//async function onChange(data: Timestamp) {
+ // await loadRemindersForMonth(selectedDate.value);
+ // await loadGeneratedReminders(selectedDate.value);
+//}
 
 function onClickDate(data: Timestamp) {
   console.info('onClickDate', data)

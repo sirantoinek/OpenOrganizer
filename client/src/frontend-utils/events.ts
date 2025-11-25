@@ -1,7 +1,7 @@
 /*
  * Authors: Rachel Patella
  * Created: 2025-10-23
- * Updated: 2025-11-24
+ * Updated: 2025-11-25
  *
  * This file contains functions to build calendar events from reminders and retrieve event type details
  *
@@ -76,33 +76,44 @@ export function buildCalendarEvents(reminders: UIReminder[], eventTypes: EventTy
       }
        // Build a single-day calendar event for each saved reminder in the viewable month
        if (reminder.isSaved) {
+       // Get start and end date for the reminder
+       const startDateStr = reminder.date;
+       const endDateStr = reminder.temporaryEventEndDateEnabled ? reminder.temporaryEventEndDay : reminder.date;
+
+      // Create date objects from start and end date to safely iterate through dates
+      const [startYearString, startMonthString, startDayString] = startDateStr.split('-');
+      const [endYearString, endMonthString, endDayString] = endDateStr.split('-');
+      const startYear = Number(startYearString);
+      const startMonth = Number(startMonthString);
+      const startDay = Number(startDayString);
+      const endYear = Number(endYearString);
+      const endMonth = Number(endMonthString);
+      const endDay = Number(endDayString);
+
+      const startDate = new Date(startYear, startMonth - 1, startDay);
+      const endDate = new Date(endYear, endMonth - 1, endDay);
+
+      // Create a calendar event on every date in the range from the start to the end date
+      while (startDate <= endDate) {
+        // Local variable for current date string in YYYY-MM-DD format
+        const currentDate = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2,'0')}-${String(startDate.getDate()).padStart(2,'0')}`;
         events.push({
           id: reminder.itemID,
           title: reminder.title,
-          date: reminder.date,
+          date: currentDate,
           color: getEventTypeColor(eventTypes, reminder.eventType),
           icon: getEventTypeIcons(eventTypes, reminder.eventType),
-          isStart: true,
-          // End day is true if single-day event (as its the start and end)
-          isEnd: reminder.temporaryEventEndDay === reminder.date
+          // Start date is true if current date matches start date
+          isStart: currentDate === startDateStr,
+          // End date is true if current date matches end date
+          // Both isStart and isEnd will be true for a same-day reminder (since startDate = endDate) for tooltip viewing
+          isEnd: currentDate === endDateStr
         });
-
-        // If reminder is a multi-event, create a marker on the end day (when viewed on calendar month)
-        if (reminder.temporaryEventEndDateEnabled) {
-          if (reminder.temporaryEventEndDay != reminder.date)  {
-            events.push({
-            id: reminder.itemID,
-            title: reminder.title,
-            date: reminder.temporaryEventEndDay,
-            color: getEventTypeColor(eventTypes, reminder.eventType),
-            icon: 'stop_circle',
-            isEnd: true
-            });
-          } 
-        }
+        // Increment date by one day for next iteration
+        startDate.setDate(startDate.getDate() + 1);
       }
     }
-
+  }
   return events;
 }
 

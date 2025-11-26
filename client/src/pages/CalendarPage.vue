@@ -1,7 +1,7 @@
 <!--
  * Authors: Rachel Patella, Maria Pasaylo, Michael Jagiello
  * Created: 2025-09-22
- * Updated: 2025-11-25
+ * Updated: 2025-11-26
  *
  * This file is the main home page that includes the calendar view, notes/reminders list, 
  * and a file explorer as a 3 column grid layout.
@@ -917,7 +917,7 @@
                 outlined
                 style="background-color: #f2f2f2; margin-bottom: 10px"
               />
-                <q-input class="note-box" outlined v-model="item.temporaryText" type="textarea" maxlength="64"
+                <q-input class="note-box" outlined v-model="item.temporaryText" type="textarea" 
                   placeholder="Write your note here..." />
                 <div class="row">
                   <!-- Pass in current note item from v-for to save that specific note -->
@@ -1188,16 +1188,16 @@ const daysOfWeekOptions = [
     // If reminder is recurring, bind to notifOffsetTimeMin
     if (reminder.recurrence) {
       if (reminder.recurrence.type === 'daily' && reminder.recurrence.daily) {
-        return reminder.recurrence.daily.notifOffsetTimeMin ?? null;
+         return reminder.recurrence.daily.notifOffsetTimeMin == null ? null : Math.abs(reminder.recurrence.daily.notifOffsetTimeMin);
       }
       else if (reminder.recurrence.type === 'weekly' && reminder.recurrence.weekly) {
-        return reminder.recurrence.weekly.notifOffsetTimeMin ?? null;
+        return reminder.recurrence.weekly.notifOffsetTimeMin == null ? null : Math.abs(reminder.recurrence.weekly.notifOffsetTimeMin);
       }
       else if (reminder.recurrence.type === 'monthly' && reminder.recurrence.monthly) {
-        return reminder.recurrence.monthly.notifOffsetTimeMin ?? null;
+        return reminder.recurrence.monthly.notifOffsetTimeMin == null ? null : Math.abs(reminder.recurrence.monthly.notifOffsetTimeMin);
       }
       else if (reminder.recurrence.type === 'yearly' && reminder.recurrence.yearly) {
-        return reminder.recurrence.yearly.notifOffsetTimeMin ?? null;
+        return reminder.recurrence.yearly.notifOffsetTimeMin == null ? null : Math.abs(reminder.recurrence.yearly.notifOffsetTimeMin);
       }
       // For any other recurrence type, return null (should not get here)
       return null;
@@ -1210,19 +1210,19 @@ const daysOfWeekOptions = [
 
   // When user changes notification offset dropdown (val), update the correct field in the reminder
   function setNotificationOffset(reminder: UIReminder, val: number| null) {
-    // If reminder is recurring, update notifOffsetTimeMin feidl to updated value
+    // If reminder is recurring, update notifOffsetTimeMin field to updated value
     if (reminder.recurrence) {
       if (reminder.recurrence.type === 'daily' && reminder.recurrence.daily) {
-        reminder.recurrence.daily.notifOffsetTimeMin = val;
+        reminder.recurrence.daily.notifOffsetTimeMin = val == null? null : Math.abs(val);
       }
       else if (reminder.recurrence.type === 'weekly' && reminder.recurrence.weekly) {
-        reminder.recurrence.weekly.notifOffsetTimeMin = val;
+        reminder.recurrence.weekly.notifOffsetTimeMin = val == null? null : Math.abs(val);
       }
       else if (reminder.recurrence.type === 'monthly' && reminder.recurrence.monthly) {
-        reminder.recurrence.monthly.notifOffsetTimeMin = val;
+        reminder.recurrence.monthly.notifOffsetTimeMin = val == null? null : Math.abs(val);
       }
       else if (reminder.recurrence.type === 'yearly' && reminder.recurrence.yearly) {
-        reminder.recurrence.yearly.notifOffsetTimeMin = val;
+        reminder.recurrence.yearly.notifOffsetTimeMin = val == null? null : Math.abs(val);
       }
     } else {
       // If reminder is not recurring, update temporaryNotificationTime field to updated value

@@ -1,7 +1,7 @@
 /*
  * Authors: Michael Jagiello
  * Created: 2025-09-20
- * Updated: 2025-10-30
+ * Updated: 2025-11-24
  *
  * This file handles many of the initialization functions, such as pulling .env variables and assigning handlers for HTTP requests.
  *
@@ -207,7 +207,7 @@ func Run(env models.ENVVars) chan error {
 		ReadTimeout:  2 * time.Second,
 		WriteTimeout: 3 * time.Second,
 		TLSConfig: &tls.Config{
-			MinVersion: tls.VersionTLS12,
+			MinVersion: tls.VersionTLS13,
 			MaxVersion: tls.VersionTLS13,
 		},
 	}

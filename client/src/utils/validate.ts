@@ -1,7 +1,7 @@
 /*
  * Authors: Michael Jagiello
  * Created: 2025-11-11
- * Updated: 2025-11-13
+ * Updated: 2025-11-18
  *
  * This file defines helper validation functions for user inputs.
  *
@@ -109,7 +109,7 @@ export function ValidateNote(note: Note) {
   if ((ret = WithinInt64(note.lastModified)) != "lastModified") return ret;
   if ((ret = ValidateString(note.title, 1, 48, "title")) != "") return ret;
   if ((ret = ValidateString(note.text, 0, 64, "text")) != "") return ret;
-  return true;
+  return "";
 }
 
 export function ValidateReminder(reminder: Reminder) {
@@ -128,6 +128,10 @@ export function ValidateReminder(reminder: Reminder) {
   if ((ret = WithinInt16(reminder.notifDay, "notifDay")) != "") return ret;
   if ((ret = WithinInt16(reminder.notifMin, "notifMin")) != "") return ret;
   if ((ret = ValidateString(reminder.title, 1, 48, "title")) != "") return ret;
+  if (reminder.eventEndYear < reminder.eventStartYear) return "end time must not be before start time";
+  if (reminder.eventEndYear == reminder.eventStartYear && reminder.eventEndDay < reminder.eventStartDay) return "end time must not be before start time";
+  if (reminder.eventEndYear == reminder.eventStartYear && reminder.eventEndDay == reminder.eventStartDay && reminder.eventEndMin < reminder.eventStartMin) return "end time must not be before start time";
+  return "";
 }
 
 export function ValidateDailyReminder(reminder: DailyReminder) {
@@ -147,6 +151,11 @@ export function ValidateDailyReminder(reminder: DailyReminder) {
   if ((ret = WithinInt32(reminder.notifOffsetTimeMin, "notifOffsetTimeMin")) != "") return ret;
   if ((ret = WithinInt16(reminder.everyNDays, "everyNDays")) != "") return ret;
   if ((ret = ValidateString(reminder.title, 1, 48, "title")) != "") return ret;
+  if (reminder.seriesEndYear < reminder.seriesStartYear) return "series end time must be after start time";
+  if (reminder.seriesEndYear == reminder.seriesStartYear && reminder.seriesEndDay < reminder.seriesStartDay) return "series end time must be after start time";
+  if (reminder.seriesEndYear == reminder.seriesStartYear && reminder.seriesEndDay == reminder.seriesStartDay && reminder.seriesEndMin < reminder.seriesStartMin) return "series end time must be after start time";
+  if (reminder.eventDurationMin < 0) return "event duration must not be negative";
+  return "";
 }
 
 export function ValidateWeeklyReminder(reminder: WeeklyReminder) {
@@ -166,6 +175,11 @@ export function ValidateWeeklyReminder(reminder: WeeklyReminder) {
   if ((ret = WithinInt32(reminder.notifOffsetTimeMin, "notifOffsetTimeMin")) != "") return ret;
   if ((ret = WithinInt16(reminder.everyNWeeks, "everyNWeeks")) != "") return ret;
   if ((ret = ValidateString(reminder.title, 1, 48, "title")) != "") return ret;
+  if (reminder.seriesEndYear < reminder.seriesStartYear) return "series end time must be after start time";
+  if (reminder.seriesEndYear == reminder.seriesStartYear && reminder.seriesEndDay < reminder.seriesStartDay) return "series end time must be after start time";
+  if (reminder.seriesEndYear == reminder.seriesStartYear && reminder.seriesEndDay == reminder.seriesStartDay && reminder.seriesEndMin < reminder.seriesStartMin) return "series end time must be after start time";
+  if (reminder.eventDurationMin < 0) return "event duration must not be negative";
+  return "";
 }
 
 export function ValidateMonthlyReminder(reminder: MonthlyReminder) {
@@ -184,6 +198,11 @@ export function ValidateMonthlyReminder(reminder: MonthlyReminder) {
   if ((ret = WithinInt32(reminder.eventDurationMin, "eventDurationMin")) != "") return ret;
   if ((ret = WithinInt32(reminder.notifOffsetTimeMin, "notifOffsetTimeMin")) != "") return ret;
   if ((ret = ValidateString(reminder.title, 1, 48, "title")) != "") return ret;
+  if (reminder.seriesEndYear < reminder.seriesStartYear) return "series end time must be after start time";
+  if (reminder.seriesEndYear == reminder.seriesStartYear && reminder.seriesEndDay < reminder.seriesStartDay) return "series end time must be after start time";
+  if (reminder.seriesEndYear == reminder.seriesStartYear && reminder.seriesEndDay == reminder.seriesStartDay && reminder.seriesEndMin < reminder.seriesStartMin) return "series end time must be after start time";
+  if (reminder.eventDurationMin < 0) return "event duration must not be negative";
+  return "";
 }
 
 export function ValidateYearlyReminder(reminder: YearlyReminder) {
@@ -202,14 +221,21 @@ export function ValidateYearlyReminder(reminder: YearlyReminder) {
   if ((ret = WithinInt32(reminder.eventDurationMin, "eventDurationMin")) != "") return ret;
   if ((ret = WithinInt32(reminder.notifOffsetTimeMin, "notifOffsetTimeMin")) != "") return ret;
   if ((ret = ValidateString(reminder.title, 1, 48, "title")) != "") return ret;
+  if (reminder.seriesEndYear < reminder.seriesStartYear) return "series end time must be after start time";
+  if (reminder.seriesEndYear == reminder.seriesStartYear && reminder.seriesEndDay < reminder.seriesStartDay) return "series end time must be after start time";
+  if (reminder.seriesEndYear == reminder.seriesStartYear && reminder.seriesEndDay == reminder.seriesStartDay && reminder.seriesEndMin < reminder.seriesStartMin) return "series end time must be after start time";
+  if (reminder.eventDurationMin < 0) return "event duration must not be negative";
+  return "";
 }
 
+// requires that the data is the full 64 bytes long
 export function ValidateExtension(extension: Extension) {
   let ret = "";
   if ((ret = WithinInt64(extension.itemID, "itemID")) != "") return ret;
   if ((ret = WithinInt32(extension.sequenceNum, "sequenceNum")) != "") return ret;
   if ((ret = WithinInt64(extension.lastModified, "lastModified")) != "") return ret;
   if ((ret = ValidateString(extension.data, 64, 64, "data")) != "") return ret;
+  return "";
 }
 
 export function ValidateFolder(folder: Folder) {
@@ -218,7 +244,8 @@ export function ValidateFolder(folder: Folder) {
   if ((ret = WithinInt64(folder.lastModified, "lastModified")) != "") return ret;
   if ((ret = WithinInt64(folder.parentFolderID, "parentFolderID")) != "") return ret;
   if ((ret = WithinInt32(folder.colorCode, "colorCode")) != "") return ret;
-  if ((ret = ValidateString(folder.folderName, 24, 24, "folderName")) != "") return ret;
+  if ((ret = ValidateString(folder.folderName, 1, 24, "folderName")) != "") return ret;
+  return "";
 }
 
 export function ValidateDeleted(deleted: Deleted) {
@@ -226,6 +253,7 @@ export function ValidateDeleted(deleted: Deleted) {
   if ((ret = WithinInt64(deleted.itemID, "itemID")) != "") return ret;
   if ((ret = WithinInt64(deleted.lastModified, "lastModified")) != "") return ret;
   if ((ret = WithinInt16(deleted.itemTable, "itemTable")) != "") return ret;
+  return "";
 }
 
 // eventTypes
@@ -247,7 +275,7 @@ export function ValidateFlight(flight: Flight) {
   if ((ret = ValidateString(flight.arrTimezoneOffset, 0, 1)) != "") return ret;
   if ((ret = ValidateString(flight.arrAirportIATA, 0, 3)) != "") return ret;
   if ((ret = ValidateString(flight.arrTimezoneAbbr, 0, 5)) != "") return ret;
-  return ret;
+  return "";
 }
 
 export function ValidateHotel(hotel: Hotel) {
@@ -257,5 +285,5 @@ export function ValidateHotel(hotel: Hotel) {
   if ((ret = ValidateString(hotel.timezoneAbbrev, 0, 5)) != "") return ret;
   if ((ret = ValidateString(hotel.timezoneOffset, 0, 1)) != "") return ret;
   if ((ret = ValidateString(hotel.roomNumber, 0, 10)) != "") return ret;
-  return ret;
+  return "";
 }

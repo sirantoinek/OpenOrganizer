@@ -1,7 +1,7 @@
 /*
  * Authors: Kevin Sirantoine, Rachel Patella, Maria Pasaylo, Michael Jagiello
  * Created: 2025-09-25
- * Updated: 2025-11-12
+ * Updated: 2025-11-16
  *
  * This file declares ipcMain handlers for APIs exposed in electron-preload and exports them via registerHandlers() to electron-main.
  *
@@ -60,6 +60,12 @@ export function registerHandlers()
 
   ipcMain.handle('createOrUpdateOverride', (event, override: Override) => {
     db.createOrUpdateOverride(override);
+    const reminders = db.readGeneratedReminders(override.itemID);
+    if (reminders !== undefined) {
+      for (const reminder of reminders) {
+        notifs.SetNotifGenerated(reminder);
+      }
+    }
   });
 
   ipcMain.handle('createFolder', (event, newFolder: Folder) => {
@@ -70,8 +76,8 @@ export function registerHandlers()
     db.createDeleted(newDeleted);
   });
 
-
   // read
+
   ipcMain.handle('readNote', (event, itemID: bigint) => {
     return db.readNote(itemID);
   });
@@ -104,15 +110,17 @@ export function registerHandlers()
   });
 
   // read in range
+
   ipcMain.handle('readNotesInRange', (event, windowStartMs: bigint, windowEndMs: bigint) => {
     return db.readNotesInRange(windowStartMs, windowEndMs);
   });
 
   ipcMain.handle('readRemindersInRange', (event, rangeWindow: RangeWindow) => {
     const reminders = db.readRemindersInRange(rangeWindow);
-    if (reminders == undefined) return undefined;
-    for (const reminder of reminders) {
-      notifs.SetNotifReminder(reminder);
+    if (reminders !== undefined) {
+      for (const reminder of reminders) {
+        notifs.SetNotifReminder(reminder);
+      }
     }
     return reminders;
   });
@@ -134,15 +142,22 @@ export function registerHandlers()
   });
 
   ipcMain.handle('readGeneratedRemindersInRange', (event, rangeWindow: RangeWindow) => {
-    return db.readGeneratedRemindersInRange(rangeWindow);
+    const reminders = db.readGeneratedRemindersInRange(rangeWindow);
+    if (reminders == undefined) return undefined;
+    for (const reminder of reminders) {
+      notifs.SetNotifGenerated(reminder);
+    }
+    return reminders;
   });
 
   // read all
+
   ipcMain.handle('readAllFolders', (event) => {
     return db.readAllFolders();
   });
 
   // read IDs based on folderID
+
   ipcMain.handle('readNotesInFolder', (event, folderID: bigint) => {
     return db.readNotesInFolder(folderID);
   });
@@ -175,8 +190,8 @@ export function registerHandlers()
     return db.readOverrideID(linkedItemID, origEventStartYear, origEventStartDay, origEventStartMin);
   });
 
-
   // update
+
   ipcMain.handle('updateNote', (event, modNote: Note) => {
     db.updateNote(modNote);
   });
@@ -207,6 +222,7 @@ export function registerHandlers()
   });
 
   // delete
+
   ipcMain.handle('deleteNote', (event, itemID: bigint) => {
     return db.deleteNote(itemID);
   });
@@ -245,6 +261,12 @@ export function registerHandlers()
   });
 
   ipcMain.handle('deleteGeneratedRemindersById', (event, itemID: bigint) => {
+    const reminders = db.readGeneratedReminders(itemID);
+    if (reminders != undefined) {
+      for (const reminder of reminders) {
+        notifs.DeleteNotifGenerated(reminder);
+      }
+    }
     db.deleteGeneratedRemindersById(itemID);
   });
 
@@ -257,11 +279,13 @@ export function registerHandlers()
   });
 
   // sync
+
   ipcMain.handle('sync', async (event) => {
     await sync();
   });
 
   // Example Handlers
+
   ipcMain.handle('sqliteRead', (event, key: string) => {
     return db.read(key);
   });
@@ -282,6 +306,7 @@ export function registerHandlers()
   });
 
   // electron-store Handlers
+
   ipcMain.handle('getStoreName', () => {
     return store.get('name');
   });

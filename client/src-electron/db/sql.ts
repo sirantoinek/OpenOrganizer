@@ -1,10 +1,9 @@
 /*
  * Authors: Kevin Sirantoine
  * Created: 2025-09-25
- * Updated: 2025-11-13
+ * Updated: 2025-11-16
  *
  * This file contains and exports all SQL statements used by sqlite-db.
- *
  *
  * This file is a part of OpenOrganizer.
  * This file and all source code within it are governed by the copyright and license terms outlined in the LICENSE file located in the top-level directory of this distribution.
@@ -239,6 +238,7 @@ export const dropDeletedTable = `
 DROP TABLE IF EXISTS deleted`;
 
 // create entry SQL statements
+
 export const createNoteStmt = `
 INSERT INTO notes (itemID, lastModified, folderID, isExtended, title, text)
 VALUES (?, ?, ?, ?, ?, ?)`;
@@ -297,8 +297,8 @@ export const createDeletedStmt = `
   INSERT INTO deleted (itemID, lastModified, itemTable)
   VALUES (?, ?, ?)`;
 
-
 // read entry SQL statements
+
 export const readNoteStmt = `
 SELECT * FROM notes
 WHERE itemID = ?`;
@@ -340,7 +340,12 @@ export const readFolderStmt = `
 SELECT * FROM folders
 WHERE folderID = ?`;
 
+export const readGeneratedsStmt = `
+SELECT * FROM generated_reminders
+WHERE itemID = ?`;
+
 // read in range
+
 export const readNotesInRangeStmt = `
 SELECT * FROM notes
 WHERE (itemID <= $windowEndMs AND itemID >= $windowStartMs)`;
@@ -400,10 +405,12 @@ WHERE (
 ORDER BY itemID ASC`;
 
 // read all
+
 export const readAllFoldersStmt = `
 SELECT * FROM folders`;
 
 // read all modified after a given timestamp
+
 export const readNotesAfterStmt = `
 SELECT * FROM notes
 WHERE (lastModified > ?)
@@ -455,6 +462,7 @@ WHERE (lastModified > ?)
 ORDER BY lastModified ASC`;
 
 // get IDs based on folderID
+
 export const readNotesInFolderStmt = `
 SELECT itemID FROM notes
 WHERE folderID = ?`;
@@ -484,6 +492,7 @@ SELECT folderID FROM folders
 WHERE parentFolderID = ?`;
 
 // read lastModified based on itemID (used in syncing)
+
 export const readNoteLmStmt = `
 SELECT lastModified FROM notes
 WHERE itemID = ?`;
@@ -532,8 +541,8 @@ export const readOverrideIDStmt = `
 SELECT itemID FROM overrides
 WHERE linkedItemID = ? AND origEventStartYear = ? AND origEventStartDay = ? AND origEventStartMin = ?`;
 
-
 // update entry SQL statements
+
 export const updateNoteStmt = `
 UPDATE notes
 SET lastModified = ?, folderID = ?, isExtended = ?, title = ?, text = ?
@@ -574,8 +583,8 @@ UPDATE folders
 SET lastModified = ?, parentFolderID = ?, colorCode = ?, folderName = ?
 WHERE folderID = ?`;
 
-
 // delete entry SQL statements
+
 export const deleteNoteStmt = `
 DELETE FROM notes
 WHERE itemID = ?`;
@@ -625,6 +634,7 @@ DELETE FROM overrides
 WHERE linkedItemID = ?`;
 
 // Example SQL
+
 export const createExTable = `
   CREATE TABLE IF NOT EXISTS example (
     id VARCHAR(32),

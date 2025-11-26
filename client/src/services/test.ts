@@ -1,7 +1,7 @@
 /*
  * Authors: Michael Jagiello
  * Created: 2025-11-04
- * Updated: 2025-11-23
+ * Updated: 2025-11-25
  *
  * This file defines the entry testing suite function and the function used to test the Renderer.
  *
@@ -32,7 +32,7 @@ async function TestingSuiteRenderer() {
   await Test_Weekly();
   await Test_Monthly();
   await Test_Yearly();
-  await Test_GeneratedBasic();
+  await Test_Generated();
   await Test_Overrides();
   await Test_Folders();
 
@@ -488,40 +488,56 @@ async function Test_Yearly() {
   }
 }
 
-async function Test_GeneratedBasic() {
+async function Test_Generated() {
   await ldb.clearAllTables();
   await ldb.createRootFolder(0);
 
+  const timeOfDayMin1 = 10, eventDurationMin1 = 10, notifOffsetTimeMin1 = -1, hasNotifs1 = true;
+
   const startStamp1 = convertTimeAndDateToTimestamp("2001-01-01", "00:00");
   const endStamp1 = convertTimeAndDateToTimestamp("2001-12-31", "23:59");
-  const timeOfDayMin1 = 10, eventDurationMin1 = 10, notifOffsetTimeMin1 = -1, hasNotifs1 = true;
   const everyNDays1 = 2;
   const daily1ID = await ldb.createDailyReminder(0n, 0, startStamp1, endStamp1, timeOfDayMin1, eventDurationMin1, notifOffsetTimeMin1, hasNotifs1, everyNDays1, "daily");
   const dailies = await ldb.readGeneratedRemindersInRange(startStamp1, endStamp1);
   Test(true, dailies.length == 183, "basic daily reminders test must have 183 results");
   Test(true, CheckGeneratedBasic(dailies));
 
+  for (let i = 0; i < 183; i++) {
+    Test(true, dailies[i]!.eventStartDay == 2 * i + 1 && dailies[i]!.eventEndDay == 2 * i + 1, "daily generated must have expected start and end day");
+  }
+
   await ldb.clearAllTables();
   await ldb.createRootFolder(0);
 
   const startStamp2 = convertTimeAndDateToTimestamp("2001-01-01", "00:00");
   const endStamp2 = convertTimeAndDateToTimestamp("2001-12-31", "23:59");
-  const everyNWeeks2 = 1, daysOfWeek2 = "0001000";
+  const everyNWeeks2 = 1, daysOfWeek2 = "0001000"; // wednesdays
   const weekly2ID = await ldb.createWeeklyReminder(0n, 0, startStamp2, endStamp2, timeOfDayMin1, eventDurationMin1, notifOffsetTimeMin1, hasNotifs1, everyNWeeks2, daysOfWeek2, "weekly");
   const weeklies = await ldb.readGeneratedRemindersInRange(startStamp2, endStamp2);
   Test(true, weeklies.length == 52, "basic weekly reminders test must have 52 results");
   Test(true, CheckGeneratedBasic(weeklies));
+
+  const expectedDaysWeekly: number[] = [3, 10, 17, 24, 31, 38, 45, 52, 59, 66, 73, 80, 87, 94, 101, 108, 115, 122, 129, 136, 143, 150, 157, 164, 171, 178, 
+    185, 192, 199, 206, 213, 220, 227, 234, 241, 248, 255, 262, 269, 276, 283, 290, 297, 304, 311, 318, 325, 332, 339, 346, 353, 360];
+  for (let i = 0; i < expectedDaysWeekly.length; i++) {
+    Test(true, weeklies[i]!.eventStartDay == expectedDaysWeekly[i] && weeklies[i]!.eventEndDay == expectedDaysWeekly[i], "monthly generated must have expected start and end day");
+  }
 
   await ldb.clearAllTables();
   await ldb.createRootFolder(0);
 
   const startStamp3 = convertTimeAndDateToTimestamp("2001-01-01", "00:00");
   const endStamp3 = convertTimeAndDateToTimestamp("2001-12-31", "23:59");
-  const lastDayOfMonth3 = false, daysOfMonth3 = "0100000000000000000000000010000";
+  const lastDayOfMonth3 = false, daysOfMonth3 = "0100000000000000000000000010000"; // 2nd and 27th days
   const monthly3ID = await ldb.createMonthlyReminder(0n, 0, startStamp3, endStamp3, timeOfDayMin1, eventDurationMin1, notifOffsetTimeMin1, hasNotifs1, lastDayOfMonth3, daysOfMonth3, "monthly");
   const monthlies = await ldb.readGeneratedRemindersInRange(startStamp3, endStamp3);
   Test(true, monthlies.length == 24, "basic monthly reminders test must have 24 results");
   Test(true, CheckGeneratedBasic(monthlies));
+
+  const expectedDaysMonthly: number[] = [2, 27, 33, 58, 61, 86, 92, 117, 122, 147, 153, 178, 183, 208, 214, 239, 245, 270, 275, 300, 306, 331, 336, 361];
+  for (let i = 0; i < expectedDaysMonthly.length; i++) {
+    Test(true, monthlies[i]!.eventStartDay == expectedDaysMonthly[i] && monthlies[i]!.eventEndDay == expectedDaysMonthly[i], "monthly generated must have expected start and end day");
+  }
 
   await ldb.clearAllTables();
   await ldb.createRootFolder(0);
@@ -532,6 +548,9 @@ async function Test_GeneratedBasic() {
   const yearlies = await ldb.readGeneratedRemindersInRange(startStamp4, endStamp4);
   Test(true, yearlies.length == 1, "basic yearly reminders test must have 1 result");
   Test(true, CheckGeneratedBasic(yearlies));
+
+  const yearly = yearlies[0]!;
+  Test(true, yearly.eventStartDay == 1 && yearly.eventEndDay == 1, "yearly generated must have expected start and end day");
 
   function CheckGeneratedBasic(generated: GeneratedReminder[]) {
     for (const reminder of generated) {

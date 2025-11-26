@@ -1,7 +1,7 @@
 <!--
  * Authors: Rachel Patella, Maria Pasaylo
  * Created: 2025-09-22
- * Updated: 2025-09-27
+ * Updated: 2025-11-24
  *
  * This file is the login form for users to log in to a preexisting account that includes a sidebar with the application name and logo
  *
@@ -63,8 +63,6 @@ const isPwd = ref(true);
 const isLoading = ref(false);
 
 async function login() {
-    // console.log("username: ", username)
-    // console.log("password: ", password)
      if (!username.value || !password.value){
         $q.notify({
             type: 'negative',
@@ -73,7 +71,6 @@ async function login() {
         return
     }
 
-    //TO DO: add other input validation requirements
     isLoading.value = true;
 
     try {
@@ -81,6 +78,10 @@ async function login() {
        
         if(result){
             console.log('Account login result:', result);
+            $q.notify({
+                type: 'positive',
+                message: 'You are now logged in!'
+            })
             //navigate to main calendar page
             await router.push('/calendar');
         } 

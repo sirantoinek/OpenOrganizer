@@ -62,15 +62,25 @@ const isPwd = ref(true);
 const isLoading = ref(false);
 
 async function register() {
-    if (!username.value || !password.value){
+    //input validation
+    const usernameValidation = await window.electronValidateAPI.validateUsername(username.value);
+    console.log("username validation: ", usernameValidation);
+    if (usernameValidation != "") {
         $q.notify({
             type: 'negative',
-            message: 'Please fill in both username and password fields.'
+            message: usernameValidation || 'Invalid username.'
         });
-        return
+        return;
     }
-
-    //TO DO: add other input validation requirements
+    const passwordValidation = await window.electronValidateAPI.validatePassword(password.value);
+    if (passwordValidation != "") {
+        $q.notify({
+            type: 'negative',
+            message: passwordValidation || 'Invalid password.'
+        });
+        return;
+    }
+        
 
     isLoading.value = true;
 
@@ -79,6 +89,10 @@ async function register() {
        
         if(result){
             console.log('Account creation result:', result);
+            $q.notify({
+                type: 'positive',
+                message: 'Account successfully created!'
+            })
             //navigate to main calendar page
             await router.push('/calendar');
         } 

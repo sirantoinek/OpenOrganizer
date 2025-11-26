@@ -27,6 +27,7 @@ import type {
 import { createAccount, loginAccount, isUserLoggedIn, changeLogin, clearLocalData} from "./auth";
 import { sync } from "./sync";
 import * as notifs from "./notifs"
+import { ValidateUsername, ValidatePassword } from "app/src/utils/validate"
 // import schedule from 'node-schedule';
 
 export function registerHandlers()
@@ -309,5 +310,13 @@ export function registerHandlers()
 
   ipcMain.handle('clearLocalData', async (event) => {
     return await clearLocalData();
+  });
+
+  ipcMain.handle('validateUsername', (event, username: string) => {
+    return ValidateUsername(username);
+  });
+
+  ipcMain.handle('validatePassword', (event, password: string) => {
+    return ValidatePassword(password);
   });
 }

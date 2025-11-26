@@ -1,7 +1,7 @@
 /*
  * Authors: Michael Jagiello
  * Created: 2025-11-08
- * Updated: 2025-11-18
+ * Updated: 2025-11-25
  *
  * This file defines all main functionality for creating, maintaining, and executing notifcations based on reminders and generated reminders.
  *
@@ -97,7 +97,7 @@ function Notify(notif: Notif) {
 // adds or updates reminder for notification details
 // only adds if hasNotif == true and is InFuture, else deletes
 export function SetNotifReminder(reminder: Reminder) {
-  if (!reminder.hasNotif && !InNearFuture(reminder)) {
+  if (!reminder.hasNotif || !InNearFuture(reminder)) {
     DeleteNotif(reminder.itemID);
     return false;
   }
@@ -109,7 +109,7 @@ export function SetNotifReminder(reminder: Reminder) {
 // adds or updates generated reminder for notification details
 // only adds if hasNotif == true and is InFuture, else deletes
 export function SetNotifGenerated(reminder: GeneratedReminder) {
-  if (!reminder.hasNotif && !InNearFuture(reminder)) {
+  if (!reminder.hasNotif || !InNearFuture(reminder)) {
     DeleteNotifGenerated(reminder);
     return false;
   }

@@ -57,6 +57,8 @@ export function convertFolderTreetoQTree(folders: UIFolder[], notes: UINote[], r
       return {
         label: note.title,
         icon: 'note',
+        iconColor: convertInttoHex(folder.colorCode),
+        iconStyle: { color: convertInttoHex(folder.colorCode)  },
         id: -itemIDBig, // Use negative bigint to distinguish notes and reminders from folders
       };
     });
@@ -70,6 +72,8 @@ export function convertFolderTreetoQTree(folders: UIFolder[], notes: UINote[], r
       return {
         label: reminder.title,
         icon: 'alarm',
+        iconColor: convertInttoHex(folder.colorCode),
+        iconStyle: { color: convertInttoHex(folder.colorCode)  },
         id: -itemIDBig,
       };
     });

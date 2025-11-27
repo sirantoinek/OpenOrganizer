@@ -34,16 +34,16 @@ export function nest(items: UIFolder[], id: bigint): UIFolder[] {
     }));
 }
 
-function convertInttoHex(colorInt: number): string {
-  if (colorInt < 0) {
+export function convertInttoHex(colorInt: bigint | number | undefined): string {
+  if (colorInt === undefined || colorInt < 0) {
     return '#459dd8'; // Default to folder color to blue
   }
 
   //convert integer to hexadecimal string and pad with leading zeros if necessary
   const hexColor= colorInt.toString(16).padStart(6, '0')
-  console.log('Converting color int:', colorInt);
   return `#${hexColor}`;
 }
+
 
 // Function to convert nested folder tree to Q-Tree format
 export function convertFolderTreetoQTree(folders: UIFolder[], notes: UINote[], reminders: UIReminder[]): QTreeFolder[] {

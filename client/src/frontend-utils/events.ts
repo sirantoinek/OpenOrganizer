@@ -10,7 +10,10 @@
  * No part of OpenOrganizer, including this file, may be reproduced, modified, distributed, or otherwise used except in accordance with the terms specified in the LICENSE file.
  */
 
-import type { UIReminder } from '../types/ui-types';
+import type { UIReminder, UIFolder } from '../types/ui-types';
+import {convertInttoHex} from '../frontend-utils/tree';
+import { get } from 'axios';
+import { event } from 'quasar';
 
 // Reminder on calendar
 export type CalendarEvent = {
@@ -59,24 +62,36 @@ export function getEventTypeColor(eventTypes: EventType[], selectedEventTypeID: 
   // Find the event type id in the eventTypes array that matches the user selected dropdown event type id
   const type = eventTypes.find(eventType => eventType.id === selectedEventTypeID);
   // If the event type is found, return the color. Otherwise, return a default color
-  return type ? type.color : 'blue';
+  return type ? type.color : '#459dd8';
 }
 
 // Create events on calendar from reminders
 // script source code similar to slot - day month example
 // https://qcalendar.netlify.app/developing/qcalendar-month
-export function buildCalendarEvents(reminders: UIReminder[], eventTypes: EventType[]): CalendarEvent[] {
+export function buildCalendarEvents(reminders: UIReminder[], eventTypes: EventType[], folders: UIFolder[]): CalendarEvent[] {
    const events: CalendarEvent[] = [];
+
+   const getFolder = (folderID: bigint | null): UIFolder | null => {
+    if (folderID === null) return null;
+    return folders.find(folder => folder.folderID === folderID) ?? null;  
+   };
 
   // Iterate through viewable calendar month reminders
   for (const reminder of reminders) {
        // Build a single-day calendar event for each saved reminder in the viewable month
        if (reminder.isSaved) {
+        const eventColorNum = getFolder(reminder.folderID)?.colorCode?? -1;
+        let eventColor: string;
+        if (eventColorNum === -1) {
+          eventColor = getEventTypeColor(eventTypes, reminder.eventType);
+        } else {
+          eventColor = convertInttoHex(eventColorNum);
+        }
         events.push({
           id: reminder.itemID,
           title: reminder.title,
           date: reminder.date,
-          color: getEventTypeColor(eventTypes, reminder.eventType),
+          color: eventColor,
           icon: getEventTypeIcons(eventTypes, reminder.eventType),
           isStart: true,
           // End day is true if single-day event (as its the start and end)
@@ -85,12 +100,13 @@ export function buildCalendarEvents(reminders: UIReminder[], eventTypes: EventTy
 
         // If reminder is a multi-event, create a marker on the end day (when viewed on calendar month)
         if (reminder.temporaryEventEndDateEnabled) {
+      
           if (reminder.temporaryEventEndDay != reminder.date)  {
             events.push({
             id: reminder.itemID,
             title: reminder.title,
             date: reminder.temporaryEventEndDay,
-            color: getEventTypeColor(eventTypes, reminder.eventType),
+            color: eventColor,
             icon: 'stop_circle',
             isEnd: true
             });

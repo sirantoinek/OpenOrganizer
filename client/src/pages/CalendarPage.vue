@@ -665,9 +665,10 @@
                 @click-head-workweek="onClickHeadWorkweek" @click-head-day="onClickHeadDay" style="height: 400px;" >
                 <template #day="{ scope: { timestamp } }">
               <template v-for="event in eventsMap[timestamp.date]" :key="String(event.id)">
+                <!--MARIA start here just call a function to change background-->
                 <div
-                  :class="['text-white', `bg-${event.color}`, 'row', 'justify-start', 'items-center',  'event-card']"
-                  style="width: 100%; margin: 1px 0 0 0; padding: 0 6px; font-size: 12px; cursor: pointer;"
+                  :class="['text-white', 'row', 'justify-start', 'items-center',  'event-card']"
+                  :style="{backgroundColor: event.color, width: '100%', margin: '1px 0 0 0', padding: '0 6px', fontSize: '12px', cursor: 'pointer'}"
                   @click="onClickCalendarEvent(event)"
                 >
                   <q-icon :name="event.icon || 'access_time'" size="14px" class="q-mr-xs" />
@@ -782,7 +783,7 @@ const eventTypes: EventType[] = [
        // Generic event type (no extra type fields)
         id: 0, 
         name: 'General', 
-        color: 'blue', 
+        color: '#2473A8', 
         icon: 'event',
         fields: []
       },
@@ -1706,7 +1707,7 @@ function addFolder() {
     temporaryFolderName: 'New Folder',
     isSaved: false,
     isEditing: true, // When new draft is added, automatically in editing mode to name it
-    colorCode: convertHexToInt('#459dd8'), // Default folder color
+    colorCode:-1, // Default folder color
   } as UIFolder;
 
   
@@ -2246,7 +2247,7 @@ watch(selectedDate, async (newDate) => {
 });
 
 // Create events on calendar from reminders
-const events = computed(() => buildCalendarEvents(monthReminders.value, eventTypes))
+const events = computed(() => buildCalendarEvents(monthReminders.value, eventTypes, folders.value))
 // Group events by date
 const eventsMap = computed(() => groupEventsByDate(events.value))
 
@@ -2426,7 +2427,7 @@ async function saveLoginChanges() {
 function convertHexToInt(hexColor: string): number {
   // Remove the leading '#' 
   hexColor = hexColor.slice(1);
-  console.log('Converting hex color to int:', hexColor);
+  //console.log('Converting hex color to int:', hexColor);
   // Parse the hex string to an integer
   return Number.parseInt(hexColor, 16);
 } 

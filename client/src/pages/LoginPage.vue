@@ -44,7 +44,6 @@
             :disable="isLoading"
             no-caps 
             label="Login"/>
-            <q-btn class="login-register-button" style="font-size: 15px" @click= "$router.push('/')" no-caps label="Index Screen" />
         </div>
     </qpage>
 </template>

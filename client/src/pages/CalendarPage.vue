@@ -1,7 +1,7 @@
 <!--
  * Authors: Rachel Patella, Maria Pasaylo, Michael Jagiello
  * Created: 2025-09-22
- * Updated: 2025-11-26
+ * Updated: 2025-11-27
  *
  * This file is the main home page that includes the calendar view, notes/reminders list, 
  * and a file explorer as a 3 column grid layout.
@@ -18,6 +18,8 @@
  * https://stackoverflow.com/questions/48351987/create-javascript-date-object-from-string-yyyy-mm-dd-in-local-timezone for constructing local date objects
  * https://stackoverflow.com/questions/12710905/how-do-i-dynamically-assign-properties-to-an-object-in-typescript for record type and dynamically rendering event type fields
  * https://github.com/quasarframework/quasar/discussions/12942 for how native input type doesn't cast to number by default
+ * https://quasar.dev/vue-components/color-picker/
+ * https://quasar.dev/vue-components/menu/
  *
  * This file is a part of OpenOrganizer.
  * This file and all source code within it are governed by the copyright and 
@@ -172,13 +174,33 @@
               <!-- If not editing, simply show the folder name. If it has an icon (folder), show it -->
               <template v-else>
                 <div class="row items-center">
-                  <q-icon v-if="node.icon" :name="node.icon" :color="node.iconColor" :style="node.iconStyle" class="q-mr-sm" />
+                  <div clickable @contextmenu.prevent>
+                      <div>
+                         <q-icon v-if="node.icon" :name="node.icon" :color="node.iconColor" :style="node.iconStyle"/>
+                      </div>
+                      <!--Pop up pallette to choose color-->
+                       <q-menu
+                        touch-position
+                        context-menu
+                        @hide="updatePresetColor()"
+                        >
+                          <q-color
+                          v-model="colorHex"
+                          default-view="palette"
+                          :palette="presetColors"
+                          class="my-picker"
+                          @update:model-value="saveFolderColor(getFolder(node.id))"
+                          >
+                          </q-color>
+                        </q-menu>
+                  </div>
                   <span>{{ node.label }}</span>
                 </div>
               </template>
             </div>
           </template>
         </q-tree>
+        
         <div style="display: flex; flex-wrap: wrap; align-items: center; margin-top: auto; gap: 4px;">
           <q-btn style="font-size: 0.9rem; color: #474747;" flat  icon="add"  label="Add">
           <q-menu>
@@ -966,9 +988,10 @@
                 <template #day="{ scope: { timestamp } }">
                 <div style="display: flex; flex-direction: row; gap: 3px; padding: 2px; align-items: center; justify-content: center; overflow:hidden; max-height: 24px;">
               <template v-for="event in eventsMap[timestamp.date]" :key="String(event.id)">
+                <!--MARIA start here just call a function to change background-->
                 <div
                 :class="`bg-${event.color}`"
-                style="width: 8px; height: 8px; border-radius: 50%; cursor: pointer; flex-shrink: 0;"
+                :style="{backgroundColor: event.color, width: '8px', height: '8px', borderRadius: '50%', cursor: 'pointer', flexShrink: 0}"
                 @click="onClickCalendarEvent(event)"
               >
                 <!-- Tooltip on hover to clarify if event start or end -->
@@ -1018,6 +1041,8 @@ import { FieldsToFlight, FieldsToHotel, FlightToExtensions, HotelToExtensions, E
 import { useQuasar } from 'quasar';
 import { useRouter } from 'vue-router';
 import { ValidateFlight, ValidateHotel } from '../utils/validate';
+import { QMenu, QColor } from 'quasar';
+import {convertInttoHex} from '../frontend-utils/tree';
 
 // Initialize active tab to reminder by default
 const tab = ref('reminders');
@@ -1237,7 +1262,7 @@ const eventTypes: EventType[] = [
        // Generic event type (no extra type fields)
         id: 0, 
         name: 'General', 
-        color: 'blue', 
+        color: '#2473A8', 
         icon: 'event',
         fields: []
       },
@@ -2713,6 +2738,9 @@ function mapDBSeriesToUIRecurringReminder(row: DailyReminder | WeeklyReminder | 
 }
   return UIReminder;
 }
+function colorCodeToHex(code: number): string {
+  return '#' + Number(code).toString(16).padStart(6, '0');
+}
 
 // Map a DB folder row into the UI folder shape
 function mapDBToUIFolder(rows: Folder[]): UIFolder[] {
@@ -2726,7 +2754,8 @@ function mapDBToUIFolder(rows: Folder[]): UIFolder[] {
     parentFolderID: (typeof row.parentFolderID === 'bigint') ? row.parentFolderID : BigInt(row.parentFolderID),
     lastModified: (typeof row.lastModified === 'bigint') ? row.lastModified : BigInt(row.lastModified),
     isSaved: true,
-    isEditing: false
+    isEditing: false,
+    colorCode: Number(row.colorCode ?? convertHexToInt('#459DD8')),        // existing DB numeric field
   })) as UIFolder[];
 
   // How to sort alphabetically: https://stackoverflow.com/questions/6712034/sort-array-by-firstname-alphabetically-in-javascript
@@ -2847,7 +2876,7 @@ function addFolder() {
     temporaryFolderName: 'New Folder',
     isSaved: false,
     isEditing: true, // When new draft is added, automatically in editing mode to name it
-    colorCode: -1,
+    colorCode:-1, // Default folder color
   } as UIFolder;
 
   
@@ -2856,6 +2885,7 @@ function addFolder() {
   // Select newly added folder
   selectedFolderID.value = tempID;
 }
+
 
 // Function to save folder after user hits enter
 async function saveFolder(folder: UIFolder){
@@ -4216,7 +4246,7 @@ const formattedMonth = computed(() => {
 })
 
 // Create events on calendar from reminders
-const events = computed(() => buildCalendarEvents(monthReminders.value, eventTypes))
+const events = computed(() => buildCalendarEvents(monthReminders.value, eventTypes, folders.value))
 // Group events by date
 const eventsMap = computed(() => groupEventsByDate(events.value))
 
@@ -4355,6 +4385,7 @@ async function logout()
             });
             //close popup of Login options (i.e. change login and logout)
             showLoginOptions.value = false;
+            await router.push('/login');
         } 
     } catch (error) {
       console.error('Logout failed:', error);
@@ -4398,4 +4429,52 @@ async function saveLoginChanges() {
   }
 
 }
+
+
+function convertHexToInt(hexColor: string): number {
+  // Remove the leading '#' 
+  hexColor = hexColor.slice(1);
+  //console.log('Converting hex color to int:', hexColor);
+  // Parse the hex string to an integer
+  return Number.parseInt(hexColor, 16);
+} 
+
+const colorHex = ref<string>('#459DD8'); // Default folder color hex value
+
+async function saveFolderColor(folder: UIFolder | null){
+  try {
+    if (!folder) {
+      console.warn('saveFolderColor: no folder provided');
+      return;
+    }
+  
+    // Update folder color in local DB
+    await updateFolder(folder.folderID, folder.parentFolderID, convertHexToInt(colorHex.value), folder.folderName);
+    // Refresh folder list after color update
+    folders.value = mapDBToUIFolder(await readAllFolders());
+  }
+  catch (error) {
+    console.error('Error updating folder color:', error);
+  }
+}
+
+
+const presetColors: string[] = [  '#D1495B', '#FF90B3','#F18805', 
+                      '#F0A202', '#FFE066', '#103900',
+                      '#9AC19A', '#459DD8','#C69DD2',
+                      '#4814BD'];
+
+async function updatePresetColor(){
+  //go through all folders
+  folders.value.forEach((folder, index) => {
+    const folderColor = convertInttoHex(folder.colorCode).toUpperCase();
+     //add recently chosen color to preset list
+    const isColorFound = presetColors.includes(folderColor);
+    if (!isColorFound){
+      presetColors.push(folderColor); 
+    }
+  });
+
+}
+
 </script>

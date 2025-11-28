@@ -1,7 +1,7 @@
 /* 
- * Authors: Rachel Patella, Michael Jagiello
+ * Authors: Rachel Patella, Michael Jagiello, Maria Pasaylo
  * Created: 025-04-13
- * Updated: 2025-09-22
+ * Updated: 2025-11-28
  *
  * This file defines all the routes (pages in the application) for the Vue Router 
  *
@@ -23,13 +23,7 @@ import type { RouteRecordRaw } from 'vue-router';
 const routes: RouteRecordRaw[] = [
   {
     path: '/',
-    component: () => import('layouts/MainLayout.vue'),
-    children: [
-      { 
-        path: '', 
-        component: () => import('pages/IndexPage.vue')
-      },
-    ], 
+    component: () => import('pages/CalendarPage.vue'),
   },
   {
       path: '/register', 

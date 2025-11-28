@@ -1086,9 +1086,8 @@ const filteredReminders = computed(() => {
         return [recurringReminder];
       }
     }
-    else {
+    // Otherwise, show reminders that match the selected date from calendar
       return defaultReminderList.filter(reminder => reminder.date === selectedDate.value);
-    }
   }
 
   // Otherwise, if search query is provided, only search normal reminders, generated reminders, and recurring drafts (default list) by title
@@ -1254,7 +1253,7 @@ const daysOfWeekOptions = [
       reminder.temporaryNotificationTime = val;
     }
   }
-
+  
 // Event type variables/functions
 // Object of event types for UI
 const eventTypes: EventType[] = [

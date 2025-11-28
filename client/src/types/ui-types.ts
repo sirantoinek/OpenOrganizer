@@ -2,7 +2,7 @@
 /*
  * Authors: Rachel Patella
  * Created: 2025-10-21
- * Updated: 2025-11-12
+ * Updated: 2025-11-23
  *
  * This file contains interfaces that extend the shared-types with UI-specific fields.
  *
@@ -12,6 +12,7 @@
  */
 
 import type { Note, Reminder, Folder } from '../../src-electron/types/shared-types'; 
+import { type Timestamp } from '@quasar/quasar-ui-qcalendar';
 
 // UI types extend client backend/shared-types model with UI-only fields for use in renderer
 // Some fields can change in the UI (ex. folderID null until user selects a folder), but are set in stone for backend DB
@@ -47,14 +48,69 @@ export type UIReminder = Reminder & {
   // Extension is always present (may be empty) to avoid undefined checks in UI. Still optional in backend
   extension: Record<string, string | number | null>;  // Essentially extension is a dictionary-like object with keys (ex. field names) and values  
   // useful for adding on custom event type fields/extensions that we may not know the types to yet
-  // Need to parse and store this text data in the separate extensions table in the backend
+  // Reminder recurrence fields to fill out UI form
+  recurrence?: recurrenceReminder | null | undefined;
+  // Used to determine which series table the recurring reminders itemID is from
+  originalRecurrenceType?: string | null;
+  isRecurring: boolean;
   isSaved: boolean;
   isEditing: boolean; 
   isSelected: boolean;
+  // Used to see saved reminder in list while user toggles recurrence
+  isConverting: boolean;
+  isGenerated: boolean;
+  // Used in overrides to track original timestamp
+  originalGeneratedTimestamp: Timestamp | null;
+  // Parent recurring series ID for generated instances
+  linkedParentSeriesID: bigint | null;
+  // Carat open/close                                                       
   expanded: boolean;
   temporaryEventEndDateEnabled: boolean;
   // UI-only date field - calendar date selected for the reminder
   date: string;
+};
+
+// Recurrence reminder (holds all recurrence reminder types)
+export type recurrenceReminder = {
+  type: string;
+  daily?: dailyReminder;
+  weekly?: weeklyReminder;
+  monthly?: monthlyReminder;
+  yearly?: yearlyReminder;
+};
+
+export type dailyReminder = {
+  timeOfDayMin: number;
+  eventDurationMin: number;
+  notifOffsetTimeMin: number | null;
+  everyNDays: number;
+  seriesEndDate: string;
+};
+
+export type weeklyReminder = {
+  timeOfDayMin: number;
+  eventDurationMin: number;
+  notifOffsetTimeMin: number | null;
+  everyNWeeks: number;
+  daysOfWeek: number[];
+  seriesEndDate: string;
+};
+
+export type monthlyReminder = {
+  timeOfDayMin: number;
+  eventDurationMin: number;
+  notifOffsetTimeMin: number | null;
+  lastDayOfMonth: boolean;
+  daysOfMonth: number[];
+  seriesEndDate: string;
+};
+
+export type yearlyReminder = {
+  timeOfDayMin: number;
+  eventDurationMin: number;
+  notifOffsetTimeMin: number | null;
+  dayOfYear: string;
+  seriesEndDate: string;
 };
 
 // Shared-types folder has folderID, lastModified, parentFolderID, colorCode, folderName

@@ -179,18 +179,16 @@
                       <!--Pop up pallette to choose color-->
                        <q-menu
                         touch-position
-                        context-menu>
+                        context-menu
+                        @hide="updatePresetColor()"
+                        >
                           <q-color
                           v-model="colorHex"
                           default-view="palette"
-                          :palette="[
-                            '#D1495B', '#FF90B3','#F18805', 
-                            '#F0A202', '#FFE066', '#103900',
-                            '#9AC19A', '#459DD8','#C69DD2',
-                            '#4814BD'
-                          ]"
+                          :palette="presetColors"
                           class="my-picker"
-                          @update:model-value="saveFolderColor(getFolder(node.id))">
+                          @update:model-value="saveFolderColor(getFolder(node.id))"
+                          >
                           </q-color>
                         </q-menu>
                   </div>
@@ -718,8 +716,7 @@ import { useQuasar } from 'quasar';
 import { useRouter } from 'vue-router';
 import { ValidateFlight, ValidateHotel } from '../utils/validate';
 import { QMenu, QColor } from 'quasar';
-
-
+import {convertInttoHex} from '../frontend-utils/tree';
 
 // Initialize active tab to reminder by default
 const tab = ref('reminders');
@@ -1590,7 +1587,7 @@ function mapDBToUIFolder(rows: Folder[]): UIFolder[] {
     lastModified: (typeof row.lastModified === 'bigint') ? row.lastModified : BigInt(row.lastModified),
     isSaved: true,
     isEditing: false,
-    colorCode: Number(row.colorCode ?? convertHexToInt('#459dd8')),        // existing DB numeric field
+    colorCode: Number(row.colorCode ?? convertHexToInt('#459DD8')),        // existing DB numeric field
   })) as UIFolder[];
 
   // How to sort alphabetically: https://stackoverflow.com/questions/6712034/sort-array-by-firstname-alphabetically-in-javascript
@@ -2431,7 +2428,8 @@ function convertHexToInt(hexColor: string): number {
   // Parse the hex string to an integer
   return Number.parseInt(hexColor, 16);
 } 
-  const colorHex = ref<string>('#459dd8'); // Default folder color hex value
+
+const colorHex = ref<string>('#459DD8'); // Default folder color hex value
 
 async function saveFolderColor(folder: UIFolder | null){
   try {
@@ -2439,6 +2437,7 @@ async function saveFolderColor(folder: UIFolder | null){
       console.warn('saveFolderColor: no folder provided');
       return;
     }
+  
     // Update folder color in local DB
     await updateFolder(folder.folderID, folder.parentFolderID, convertHexToInt(colorHex.value), folder.folderName);
     // Refresh folder list after color update
@@ -2449,5 +2448,23 @@ async function saveFolderColor(folder: UIFolder | null){
   }
 }
 
+
+const presetColors: string[] = [  '#D1495B', '#FF90B3','#F18805', 
+                      '#F0A202', '#FFE066', '#103900',
+                      '#9AC19A', '#459DD8','#C69DD2',
+                      '#4814BD'];
+
+async function updatePresetColor(){
+  //go through all folders
+  folders.value.forEach((folder, index) => {
+    const folderColor = convertInttoHex(folder.colorCode).toUpperCase();
+     //add recently chosen color to preset list
+    const isColorFound = presetColors.includes(folderColor);
+    if (!isColorFound){
+      presetColors.push(folderColor); 
+    }
+  });
+
+}
 
 </script>

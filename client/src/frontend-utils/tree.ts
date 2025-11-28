@@ -1,7 +1,7 @@
 /*
  * Authors: Rachel Patella, Maria Pasaylo
  * Created: 2025-10-23
- * Updated: 2025-11-22
+ * Updated: 2025-11-26
  *
  * This file contains functions to create the file explorer tree structure and breadcrumb trail path
  *

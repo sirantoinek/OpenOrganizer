@@ -1,7 +1,7 @@
 <!--
  * Authors: Rachel Patella, Maria Pasaylo, Michael Jagiello
  * Created: 2025-09-22
- * Updated: 2025-11-22
+ * Updated: 2025-11-27
  *
  * This file is the main home page that includes the calendar view, notes/reminders list, 
  * and a file explorer as a 3 column grid layout.

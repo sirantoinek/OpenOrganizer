@@ -1,7 +1,7 @@
 /*
  * Authors: Maria Pasaylo, Kevin Sirantoine
  * Created: 2025-10-07
- * Updated: 2025-11-24
+ * Updated: 2025-11-28
  *
  * This file contains functions related to user authentication including getters
  * and setters for privateKey, username, password, and authToken.
@@ -12,14 +12,14 @@
  * No part of OpenOrganizer, including this file, may be reproduced, modified, distributed, or otherwise used except in accordance with the terms specified in the LICENSE file.
  */
 
-import {hash256, hash512_256, generatePrivateKey, encrypt, decrypt} from "app/src-electron/services/crypto";
+import { hash256, hash512_256, generatePrivateKey, encrypt, decrypt } from "app/src-electron/services/crypto";
 import Store from 'electron-store';
-import type {Schema} from 'electron-store';
-import axios, { get } from 'axios';
+import type { Schema } from 'electron-store';
+import axios from 'axios';
 import fs from 'fs';
 import path from "path";
-import {app} from 'electron';
-import {clearAllTables} from "app/src-electron/db/sqlite-db";
+import { app } from 'electron';
+import { clearAllTables } from "app/src-electron/db/sqlite-db";
 
 interface Account{
   username: string;
@@ -164,12 +164,6 @@ export async function createAccount(username : string, password : string): Promi
   encryptedPrivateKey1.copy(userData, 64);
   encryptedPrivateKey2.copy(userData, 96);
 
-  //Testing user data to send to server
-  //console.log(getUserId(), getUserId());
-  // console.log('REGISTER USER DATA', userData.toString('utf8'));
-  // console.log('REGISTER USER DATA RAW', userData);
-  // console.log('REGISTER USER DATA LENGTH', userData.length);
-
   // Sending in raw data via API request to /register
   try{
     const serverURL = getServerURL();
@@ -181,8 +175,6 @@ export async function createAccount(username : string, password : string): Promi
     //Parse the reponse
     const responseData = response.data;
 
-    //Testing if we got the correct response
-    // console.log('Response data', responseData);
     console.log("REGISTER STATUS: " + response.status);
 
     // //userID [0:8], authToken[8:40]
@@ -227,12 +219,6 @@ export async function createAccount(username : string, password : string): Promi
     usernameBuffer.copy(userData, 0);
     hashServerPassword.copy(userData, 32);
 
-    //testing output
-    // console.log('LOG IN USER DATA', userData.toString('utf8'));
-    // console.log('LOG IN USER DATA RAW', userData);
-    // console.log('LOG IN USER DATA LENGTH', userData.length);
-
-
     //Sending in raw data via API request to /login
     try {
       const serverURL = getServerURL();
@@ -274,7 +260,7 @@ export async function createAccount(username : string, password : string): Promi
     const oldUsername = getUsername();
     const oldPassword = getPassword();
     newUsername = newUsername || oldUsername;
-    newPassword = newPassword || oldPassword; 
+    newPassword = newPassword || oldPassword;
 
     //update stored username and password
     setUsername(newUsername);
@@ -292,7 +278,7 @@ export async function createAccount(username : string, password : string): Promi
     const encrPrivateKey1: Buffer = getPrivateKey1();
     const encrPrivateKey2: Buffer = getPrivateKey2();
 
-    //Store username[0:32], passwordHash[32:64], newUsername[64:96], newPasswordHash[96:128], 
+    //Store username[0:32], passwordHash[32:64], newUsername[64:96], newPasswordHash[96:128],
     //privateKey1[128:160], privateKey2[160:192] to send to server
     const userData = Buffer.alloc(192,20);
     oldUsernameBuffer.copy(userData, 0);
@@ -313,14 +299,10 @@ export async function createAccount(username : string, password : string): Promi
       const response = await axios.post<ArrayBuffer>(`${serverURL}changelogin`, userData, {
         'responseType': 'arraybuffer',
         headers:{'Content-Type': 'application/octet-stream'}
-      }); 
+      });
 
       // Parse and store the userID, authToken, decrypt encrypted private keys
       const responseData = response.data;
-
-      //More testing
-      // console.log('CHANGE LOGIN RESPONSE DATA!!!!!!!', Buffer.from(responseData).toString('utf8'));
-      // console.log('CHANGE LOGIN RESPONSE STATUS!!!!!!!',response.status);
 
       //userID [0:8], authToken[8:40]
       const userIdBytes = Buffer.from(responseData.slice(0, 8));
@@ -331,7 +313,7 @@ export async function createAccount(username : string, password : string): Promi
       setAuthToken(authTokenBytes);
       setAutoSyncEnabled(true);
 
-     
+
     } catch (error){
       console.error("Error changing username and password: ", error);
       return false;

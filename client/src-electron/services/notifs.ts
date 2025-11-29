@@ -14,7 +14,7 @@ import * as cron from 'node-cron'
 import { Notification } from 'electron';
 import { getDayOfYear, type Timestamp } from '@quasar/quasar-ui-qcalendar';
 import { convertTimeAndDateToTimestamp } from "src/frontend-utils/time";
-import type { GeneratedReminder, Override, Reminder, RangeWindow } from "../types/shared-types";
+import type { GeneratedReminder, Reminder, RangeWindow } from "../types/shared-types";
 import { readRemindersInRange, readGeneratedRemindersInRange } from "../db/sqlite-db";
 
 interface Notif {
@@ -68,8 +68,8 @@ async function PullToday() {
   const generated = readGeneratedRemindersInRange(rangeWindow);
   if (reminders != undefined) {
     for (const reminder of reminders) {
-      if (reminder.notifYear == year && 
-          reminder.notifDay == getDayOfYear(startToday) && 
+      if (reminder.notifYear == year &&
+          reminder.notifDay == getDayOfYear(startToday) &&
           reminder.notifMin == minuteOfToday) {
         const notif = ReminderToNotif(reminder);
         Notify(notif);
@@ -78,8 +78,8 @@ async function PullToday() {
   }
   if (generated != undefined) {
     for (const reminder of generated) {
-      if (reminder.notifYear == year && 
-          reminder.notifDay == getDayOfYear(startToday) && 
+      if (reminder.notifYear == year &&
+          reminder.notifDay == getDayOfYear(startToday) &&
           reminder.notifMin == minuteOfToday) {
         const notif = GeneratedToNotif(reminder);
         Notify(notif);

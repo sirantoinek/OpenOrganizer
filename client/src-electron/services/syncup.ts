@@ -12,10 +12,10 @@
  */
 import * as pack from "../utils/pack";
 import * as db from "../db/sqlite-db";
-import {serverAddress} from "app/src-electron/electron-main";
-import {getAuthToken, getUserId} from "app/src-electron/services/auth";
-import {lastUpdated} from "app/src-electron/services/store";
-import {sendRequest, logResponse} from "../utils/sync-utils";
+import { serverAddress } from "app/src-electron/electron-main";
+import { getAuthToken, getUserId } from "app/src-electron/services/auth";
+import { lastUpdated } from "app/src-electron/services/store";
+import { sendRequest, logResponse } from "../utils/sync-utils";
 
 export async function syncUp() {
   await upFolders();

@@ -12,8 +12,6 @@
 
 import type { UIReminder, UIFolder } from '../types/ui-types';
 import {convertInttoHex} from '../frontend-utils/tree';
-import { get } from 'axios';
-import { event } from 'quasar';
 
 // Reminder on calendar
 export type CalendarEvent = {
@@ -55,7 +53,6 @@ export function getEventTypeIcons(eventTypes: EventType[], selectedEventTypeID: 
   // If the event type is found, return the icon. Otherwise, return a default icon
   return type ? type.icon : '';
 }
-
 
 // Function to get event type colors - will change checkbox to match event type color
 export function getEventTypeColor(eventTypes: EventType[], selectedEventTypeID: number) {

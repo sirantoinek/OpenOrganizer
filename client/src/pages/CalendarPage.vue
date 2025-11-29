@@ -4001,9 +4001,6 @@ async function deleteReminder(reminder: UIReminder) {
   } catch (error) {
     console.error('Error deleting reminder from DB:', error);
   }
-  // Remove reminders that have checkbox selected from reminders array
-  // Creates new filtered array to render that only includes reminders that are not selected
-  //reminders.value = reminders.value.filter(reminder => !reminder.isSelected);
 }
 
 // Function to delete selected recurring reminders
@@ -4073,9 +4070,6 @@ async function deleteNote(note: UINote) {
   } catch (error) {
     console.error('Error deleting note from DB:', error);
   }
-  // Remove notes that have checkbox selected from notes array
-  // Creates new filtered array to render that only includes notes that are not selected
-  // notes.value = notes.value.filter(note => !note.isSelected);
 }
 
 // Function to delete a folder or note/reminder from tree and DB
@@ -4396,16 +4390,6 @@ function onNext() {
   }
 }
 
-// Show reminders for current calendar month
-//async function onMoved(data: Timestamp) {
- // await loadRemindersForMonth(selectedDate.value);
- //await loadGeneratedReminders(selectedDate.value);
-//}
-//async function onChange(data: Timestamp) {
- // await loadRemindersForMonth(selectedDate.value);
- // await loadGeneratedReminders(selectedDate.value);
-//}
-
 function onClickDate(data: Timestamp) {
   console.info('onClickDate', data)
 }
@@ -4433,7 +4417,6 @@ async function logout()
   try {
     const isDeleted: boolean = await window.electronAuthAPI.clearLocalData();
     if(isDeleted){
-            console.log('Account logout result:', isDeleted);
             $q.notify({
             type: 'positive',
             message: 'Successfully logged out'
@@ -4465,7 +4448,6 @@ async function saveLoginChanges() {
   try {
     const isLoginChanged = await window.electronAuthAPI.changeLogin(newUsername.value, newPassword.value);
     if (isLoginChanged) {
-      console.log('Login credentials changed successfully:', isLoginChanged);
       $q.notify({
         type: 'positive',
         message: 'Login credentials changed successfully.'
@@ -4489,7 +4471,6 @@ async function saveLoginChanges() {
 function convertHexToInt(hexColor: string): number {
   // Remove the leading '#' 
   hexColor = hexColor.slice(1);
-  //console.log('Converting hex color to int:', hexColor);
   // Parse the hex string to an integer
   return Number.parseInt(hexColor, 16);
 } 

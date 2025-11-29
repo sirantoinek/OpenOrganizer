@@ -113,5 +113,10 @@ declare global {
       clearLocalData: () => Promise<boolean>;
       isUserLoggedIn: () => Promise<boolean>;
     }
+
+    electronValidateAPI: {
+      validateUsername: (username: string) => Promise<string>;
+      validatePassword: (password: string) => Promise<string>;  
+    }
   }
 }

@@ -142,3 +142,8 @@ contextBridge.exposeInMainWorld('electronAuthAPI', {
   clearLocalData: () => ipcRenderer.invoke('clearLocalData'),
   isUserLoggedIn: () => ipcRenderer.invoke('isUserLoggedIn')
 });
+
+contextBridge.exposeInMainWorld('electronValidateAPI', {
+  validateUsername: (username: string) => ipcRenderer.invoke('validateUsername', username),
+  validatePassword: (password: string)=> ipcRenderer.invoke('validatePassword', password)
+});

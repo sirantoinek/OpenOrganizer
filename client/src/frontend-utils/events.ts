@@ -1,7 +1,7 @@
 /*
  * Authors: Rachel Patella
  * Created: 2025-10-23
- * Updated: 2025-11-27
+ * Updated: 2025-11-28
  *
  * This file contains functions to build calendar events from reminders and retrieve event type details
  *
@@ -12,8 +12,6 @@
 
 import type { UIReminder, UIFolder } from '../types/ui-types';
 import {convertInttoHex} from '../frontend-utils/tree';
-import { get } from 'axios';
-import { event } from 'quasar';
 
 // Reminder on calendar
 export type CalendarEvent = {
@@ -56,7 +54,6 @@ export function getEventTypeIcons(eventTypes: EventType[], selectedEventTypeID: 
   return type ? type.icon : '';
 }
 
-
 // Function to get event type colors - will change checkbox to match event type color
 export function getEventTypeColor(eventTypes: EventType[], selectedEventTypeID: number) {
   // Find the event type id in the eventTypes array that matches the user selected dropdown event type id
@@ -70,6 +67,10 @@ export function getEventTypeColor(eventTypes: EventType[], selectedEventTypeID: 
 // https://qcalendar.netlify.app/developing/qcalendar-month
 export function buildCalendarEvents(reminders: UIReminder[], eventTypes: EventType[], folders: UIFolder[]): CalendarEvent[] {
    const events: CalendarEvent[] = [];
+   // Ensure multiday events do not duplicate on calendar
+   // This is because a multi-day reminder is technically one reminder that spans multiple days, not separate reminders for each day like generated
+   // Therefore each reminder should only be processed once to create calendar events for each day in the range, use a set for no duplicates
+   const reminderIDProcessed = new Set<string>();
 
    const getFolder = (folderID: bigint | null): UIFolder | null => {
     if (folderID === null) return null;
@@ -84,13 +85,23 @@ export function buildCalendarEvents(reminders: UIReminder[], eventTypes: EventTy
       }
        // Build a single-day calendar event for each saved reminder in the viewable month
        if (reminder.isSaved) {
-        // Get the color cfrom folder color if set, otherwise get from event type
+        // Create a key for the reminder to check if it has been processed already
+        const reminderKey = String(reminder.itemID);
+        // Reminder has already been processed, skip to next reminder
+        if (reminderIDProcessed.has(reminderKey)) {
+          continue;
+        }
+        // Otherwise, reminder has not been processed yet, add to set
+        reminderIDProcessed.add(reminderKey);
+
+        // Get the color code from folder color if set, otherwise get from event type
         const eventColorNum = getFolder(reminder.folderID)?.colorCode?? -1;
         let eventColor: string;
         if (eventColorNum === -1) {
           eventColor = getEventTypeColor(eventTypes, reminder.eventType).toUpperCase();
         } else {
           eventColor = convertInttoHex(eventColorNum).toUpperCase();
+        }
        // Get start and end date for the reminder
        const startDateStr = reminder.date;
        const endDateStr = reminder.temporaryEventEndDateEnabled ? reminder.temporaryEventEndDay : reminder.date;

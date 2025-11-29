@@ -1,7 +1,7 @@
 <!--
  * Authors: Rachel Patella, Maria Pasaylo
  * Created: 2025-09-22
- * Updated: 2025-11-24
+ * Updated: 2025-11-28
  *
  * This file is the login form for users to log in to a preexisting account that includes a sidebar with the application name and logo
  *
@@ -74,9 +74,7 @@ async function login() {
 
     try {
         const result = await window.electronAuthAPI.loginAccount(username.value, password.value);
-       
         if(result){
-            console.log('Account login result:', result);
             $q.notify({
                 type: 'positive',
                 message: 'You are now logged in!'

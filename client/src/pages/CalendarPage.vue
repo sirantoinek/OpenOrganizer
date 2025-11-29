@@ -1,7 +1,7 @@
 <!--
  * Authors: Rachel Patella, Maria Pasaylo, Michael Jagiello
  * Created: 2025-09-22
- * Updated: 2025-11-27
+ * Updated: 2025-11-28
  *
  * This file is the main home page that includes the calendar view, notes/reminders list, 
  * and a file explorer as a 3 column grid layout.
@@ -1086,9 +1086,8 @@ const filteredReminders = computed(() => {
         return [recurringReminder];
       }
     }
-    else {
+    // Otherwise, show reminders that match the selected date from calendar
       return defaultReminderList.filter(reminder => reminder.date === selectedDate.value);
-    }
   }
 
   // Otherwise, if search query is provided, only search normal reminders, generated reminders, and recurring drafts (default list) by title
@@ -1254,7 +1253,7 @@ const daysOfWeekOptions = [
       reminder.temporaryNotificationTime = val;
     }
   }
-
+  
 // Event type variables/functions
 // Object of event types for UI
 const eventTypes: EventType[] = [
@@ -1963,27 +1962,62 @@ async function loadRemindersForMonth(dateString: string) {
   const startRange = convertTimeAndDateToTimestamp(startDayOfMonth, '');
   const endRange = convertTimeAndDateToTimestamp(lastDayString, '23:59');
 
+  // Build start and end timestamps for previous month
+  // If previous month is January, roll over to December of the previous year. Otherwise, decrement the month and stay in the year
+  const prevMonth = (month === 1) ? 12 : month - 1;
+  const prevYear = (month === 1) ? year - 1 : year;
+  const prevMonthStartDay = `${prevYear}-${String(prevMonth).padStart(2, '0')}-01`;
+  const prevMonthLastDay = new Date(prevYear, prevMonth, 0).getDate();
+  const prevMonthLastDayString = `${prevYear}-${String(prevMonth).padStart(2, '0')}-${String(prevMonthLastDay).padStart(2, '0')}`;
+  const prevMonthStartRange = convertTimeAndDateToTimestamp(prevMonthStartDay, '');
+  const prevMonthEndRange = convertTimeAndDateToTimestamp(prevMonthLastDayString, '23:59');
+
+  // Build start and end timestamps for next month 
+  // If month is December, roll over to January of the next year. Otherwise, increment the month and stay in the year
+  const nextMonth = (month === 12) ? 1 : month + 1;
+  const nextYear = (month === 12) ? year + 1 : year;
+  const nextMonthStartDay = `${nextYear}-${String(nextMonth).padStart(2, '0')}-01`;
+  const nextMonthLastDay = new Date(nextYear, nextMonth, 0).getDate();
+  const nextMonthLastDayString = `${nextYear}-${String(nextMonth).padStart(2, '0')}-${String(nextMonthLastDay).padStart(2, '0')}`;
+  const nextMonthStartRange = convertTimeAndDateToTimestamp(nextMonthStartDay, '');
+  const nextMonthEndRange = convertTimeAndDateToTimestamp(nextMonthLastDayString, '23:59');
+
   try {
     // Clear normal reminders before loading from database for calendar, keep generated reminders
     monthReminders.value = monthReminders.value.filter(reminder => reminder.isGenerated);
+    // Read the previous month
+    const prevMonthReminders = await readRemindersInRange(prevMonthStartRange, prevMonthEndRange);
+    // Convert each reminder in range from response to UI reminder format 
+    for (const reminder of prevMonthReminders) {
+      // Update reminders list
+      const result = mapDBToUIReminder(reminder, false);
+      // push into monthReminders so the calendar uses these events
+      monthReminders.value.push(result);
+    }
+
+    // Read the current month
     const rows = await readRemindersInRange(startRange, endRange);
-    const requestedYM = `${String(year).padStart(4,'0')}-${String(month).padStart(2,'0')}`;
     // Convert each reminder in range from response to UI reminder format 
     for (const reminder of rows) {
       // Update reminders list
       const result = mapDBToUIReminder(reminder, false);
-      // Extra check to only include items whos month match the calendar month
-        if (result.date && result.date.startsWith(requestedYM)) {
-          // push into monthReminders so the calendar uses these events
-          monthReminders.value.push(result);
-        }
-      }
+      // push into monthReminders so the calendar uses these events
+      monthReminders.value.push(result);
+    }
+
+    // Read the next month
+    const nextMonthReminders = await readRemindersInRange(nextMonthStartRange, nextMonthEndRange);
+    for (const reminder of nextMonthReminders) {
+      const result = mapDBToUIReminder(reminder, false);
+      monthReminders.value.push(result);
+    }
     } catch (error) {
     console.error('Error loading reminders for month:', error);
   } 
 }
 
-// Load generated reminders for the current viewable calendar month + next month
+// Load generated reminders for the current viewable calendar month 
+// QCalendar shows days from the previous, current, and next month so all events in this range must be loaded for display
 async function loadGeneratedReminders(dateString: string) {
 // Split date string by delimiter '-' to get each part (year, month, day)
   const [yearString, monthString, dayString] = dateString.split('-');
@@ -2011,7 +2045,7 @@ async function loadGeneratedReminders(dateString: string) {
 
   // Build start and end timestamps to load in range (from first day to last day of month)
   // First day of the month - ex. 2025-11-01
-  const startDayOfMonth= `${year}-${String(month).padStart(2, '0')}-01`;
+  const startDayOfMonth = `${year}-${String(month).padStart(2, '0')}-01`;
   // Last day of the month - ex. 2025-11-30
   // Date returns the day before the first day of the next month (always the last day - ex. 30 for Nov, 31 for Dec, 28 for Feb)
   const lastDayOfMonth = new Date(year, month, 0).getDate();
@@ -2021,8 +2055,17 @@ async function loadGeneratedReminders(dateString: string) {
   const startRange = convertTimeAndDateToTimestamp(startDayOfMonth, '');
   const endRange = convertTimeAndDateToTimestamp(lastDayString, '23:59');
 
+  // Build start and end timestamps for previous month
+  // If previous month is January, roll over to December of the previous year. Otherwise, decrement the month and stay in the year
+  const prevMonth = (month === 1) ? 12 : month - 1;
+  const prevYear = (month === 1) ? year - 1 : year;
+  const prevMonthStartDay = `${prevYear}-${String(prevMonth).padStart(2, '0')}-01`;
+  const prevMonthLastDay = new Date(prevYear, prevMonth, 0).getDate();
+  const prevMonthLastDayString = `${prevYear}-${String(prevMonth).padStart(2, '0')}-${String(prevMonthLastDay).padStart(2, '0')}`;
+  const prevMonthStartRange = convertTimeAndDateToTimestamp(prevMonthStartDay, '');
+  const prevMonthEndRange = convertTimeAndDateToTimestamp(prevMonthLastDayString, '23:59');
+
   // Build start and end timestamps for next month 
-  // This is necessary because notifications are only scheduled for generated reminders on frontend read
   // If month is December, roll over to January of the next year. Otherwise, increment the month and stay in the year
   const nextMonth = (month === 12) ? 1 : month + 1;
   const nextYear = (month === 12) ? year + 1 : year;
@@ -2038,6 +2081,16 @@ async function loadGeneratedReminders(dateString: string) {
     reminders.value = reminders.value.filter(reminder => !reminder.isGenerated);
     monthReminders.value = monthReminders.value.filter(reminder => !reminder.isGenerated);
 
+     // Read the previous month
+    const prevMonthReminders = await readGeneratedRemindersInRange(prevMonthStartRange, prevMonthEndRange);
+    // Convert each generated reminder in range from response to UI reminder format 
+    for (const generatedReminder of prevMonthReminders) {
+      // Map to UI and push to middle list (reminders array)
+      const result = mapDBGeneratedToUIReminder(generatedReminder, true);
+      // Push generated reminder to current month calendar view
+      monthReminders.value.push(result);
+    }
+
     // Read the viewable calendar month
     const currentMonthReminders = await readGeneratedRemindersInRange(startRange, endRange);
     // Convert each generated reminder in range from response to UI reminder format 
@@ -2048,14 +2101,16 @@ async function loadGeneratedReminders(dateString: string) {
       monthReminders.value.push(result);
     }
 
-    // Read the next month after
+     // Read the next month
     const nextMonthReminders = await readGeneratedRemindersInRange(nextMonthStartRange, nextMonthEndRange);
-    // Convert each generated reminder in range from response to UI reminder format
+    // Convert each generated reminder in range from response to UI reminder format 
     for (const generatedReminder of nextMonthReminders) {
       // Map to UI and push to middle list (reminders array)
-      // Do not push to monthReminders since its not in the current month view
-      mapDBGeneratedToUIReminder(generatedReminder, true);
+      const result = mapDBGeneratedToUIReminder(generatedReminder, true);
+      // Push generated reminder to current month calendar view
+      monthReminders.value.push(result);
     }
+
   } catch (error) {
     console.error('Error loading reminders for month:', error);
   } 
@@ -3946,9 +4001,6 @@ async function deleteReminder(reminder: UIReminder) {
   } catch (error) {
     console.error('Error deleting reminder from DB:', error);
   }
-  // Remove reminders that have checkbox selected from reminders array
-  // Creates new filtered array to render that only includes reminders that are not selected
-  //reminders.value = reminders.value.filter(reminder => !reminder.isSelected);
 }
 
 // Function to delete selected recurring reminders
@@ -4018,9 +4070,6 @@ async function deleteNote(note: UINote) {
   } catch (error) {
     console.error('Error deleting note from DB:', error);
   }
-  // Remove notes that have checkbox selected from notes array
-  // Creates new filtered array to render that only includes notes that are not selected
-  // notes.value = notes.value.filter(note => !note.isSelected);
 }
 
 // Function to delete a folder or note/reminder from tree and DB
@@ -4341,16 +4390,6 @@ function onNext() {
   }
 }
 
-// Show reminders for current calendar month
-//async function onMoved(data: Timestamp) {
- // await loadRemindersForMonth(selectedDate.value);
- //await loadGeneratedReminders(selectedDate.value);
-//}
-//async function onChange(data: Timestamp) {
- // await loadRemindersForMonth(selectedDate.value);
- // await loadGeneratedReminders(selectedDate.value);
-//}
-
 function onClickDate(data: Timestamp) {
   console.info('onClickDate', data)
 }
@@ -4378,7 +4417,6 @@ async function logout()
   try {
     const isDeleted: boolean = await window.electronAuthAPI.clearLocalData();
     if(isDeleted){
-            console.log('Account logout result:', isDeleted);
             $q.notify({
             type: 'positive',
             message: 'Successfully logged out'
@@ -4410,7 +4448,6 @@ async function saveLoginChanges() {
   try {
     const isLoginChanged = await window.electronAuthAPI.changeLogin(newUsername.value, newPassword.value);
     if (isLoginChanged) {
-      console.log('Login credentials changed successfully:', isLoginChanged);
       $q.notify({
         type: 'positive',
         message: 'Login credentials changed successfully.'
@@ -4434,7 +4471,6 @@ async function saveLoginChanges() {
 function convertHexToInt(hexColor: string): number {
   // Remove the leading '#' 
   hexColor = hexColor.slice(1);
-  //console.log('Converting hex color to int:', hexColor);
   // Parse the hex string to an integer
   return Number.parseInt(hexColor, 16);
 } 

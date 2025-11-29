@@ -365,7 +365,7 @@ export function readFolder(folderID: bigint) {
 }
 
 export function readGeneratedReminders(itemID: bigint) {
-  const reminders = readGeneratedsStmt.get(itemID) as GeneratedReminder[];
+  const reminders = readGeneratedsStmt.all(itemID) as GeneratedReminder[];
   if (reminders === undefined) return undefined;
   castGeneratedRemindersBigInts(reminders);
   return reminders;

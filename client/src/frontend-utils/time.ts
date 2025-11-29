@@ -1,7 +1,7 @@
 /*
  * Authors: Rachel Patella
  * Created: 2025-10-23
- * Updated: 2025-11-24
+ * Updated: 2025-11-28
  *
  * This file contains helper functions to handle time and date conversions on the client
  *
@@ -34,10 +34,8 @@ export function convertTimeAndDateToTimestamp(dateString: string, timeString: st
   const second = Number(secondString);
   // Javascript date month is 0-based (Jan = 0) so subtract 1 from month
   const dateTime = new Date(year, month - 1, day, hour, minute, second, 0);
-  //console.log("Constructed dateTime object:", dateTime);
   // Parse date object into a qcalendar timestamp
   const timeStamp = parseDate(dateTime);
-  //console.log("Converted Timestamp:", timeStamp);
   // Return object that has all timestamp fields plus original date for UI rendering
   return {
   ...timeStamp,
@@ -62,13 +60,11 @@ export function convertNotificationTimestamp(dateString: string, timeString: str
   const second = Number(secondString);
   // Javascript date month is 0-based (Jan = 0) so subtract 1 from month
   const dateTime = new Date(year, month - 1, day, hour, minute, second, 0);
-  // console.log("Constructed dateTime object:", dateTime);
   // Compute notification time (ex. remind me 30 mins before event start) into a usable date object for scheduling
   // Subtracts the epoch of the event start time (in ms) by the minutes before event converted to ms (* 60000)
   const notifyTime = new Date(dateTime.getTime() - Number(minutesBeforeEvent) * 60000);
   // Convert notification date object into a qcalendar timestamp
   const notifyTimestamp = parseDate(notifyTime);
-  // console.log("Notification Timestamp:", notifyTimestamp);
   return notifyTimestamp as Timestamp;
 }
 
@@ -77,9 +73,7 @@ export function timeStamptoEpoch(timestamp: Timestamp): number {
   // Q-calendar month is 1-based (Jan = 1), Javascript date month is 0-based (Jan = 0) so subtract 1 from month
   // Set seconds to 0 since notification will go off at exact minute change
   const date = new Date(timestamp.year, timestamp.month - 1, timestamp.day, timestamp.hour, timestamp.minute, 0);
-  // console.log("Converted date object from timestamp:", date);
   const epochTime = date.getTime();
-  // console.log("Converted epoch time from timestamp:", epochTime);
   return epochTime;
 }
 
@@ -205,7 +199,6 @@ export function endDateRangeRecurring(startDate: string, fallbackDate: string) {
     // Takes the start date (0 time) and add 100 years for end date
     endDate.setFullYear(endDate.getFullYear() + 100);
     const endString = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`;
-
     return endString;
   }
 }

@@ -7,7 +7,6 @@ A cross-platform desktop reminder and note-taking calendar application built wit
 * Keep data secure by encrypting it for transmission and cloud storage to where not even the server can read it
 * Create daily, weekly, bi-weekly, monthly, and yearly recurring reminders
 * Sort reminders and notes into color-coded folders for easy organization
-* Use existing reminders as a template for new ones
 * ... and more!
 
 ## Team Members:

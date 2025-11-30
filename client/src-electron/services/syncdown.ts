@@ -11,10 +11,10 @@
  * No part of OpenOrganizer, including this file, may be reproduced, modified, distributed, or otherwise used except in accordance with the terms specified in the LICENSE file.
  */
 import * as unpack from "../utils/unpack";
-import {serverAddress} from "app/src-electron/electron-main";
-import {getAuthToken, getUserId, loginAccount} from "app/src-electron/services/auth";
-import {sendRequest, logResponse} from "../utils/sync-utils";
-import {lastUpdated} from "app/src-electron/services/store";
+import { serverAddress } from "app/src-electron/electron-main";
+import { getAuthToken, getUserId, loginAccount } from "app/src-electron/services/auth";
+import { sendRequest, logResponse } from "../utils/sync-utils";
+import { lastUpdated } from "app/src-electron/services/store";
 import type {
   Note,
   Extension,
@@ -161,6 +161,7 @@ export async function downDeleted(startTime: bigint) {
 
   return unpack.unpackDeleted(reqDetails.repeatedData, reqDetails.recordCount);
 }
+
 
 // helpers
 function getBody(startTime: bigint) {

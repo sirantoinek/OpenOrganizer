@@ -21,8 +21,8 @@ import type {
   Override,
   Deleted
 } from "app/src-electron/types/shared-types";
-import {decrypt} from "app/src-electron/services/crypto";
-import {getPrivateKey1} from "app/src-electron/services/auth";
+import { decrypt } from "app/src-electron/services/crypto";
+import { getPrivateKey1 } from "app/src-electron/services/auth";
 
 export function unpackLastUp(data: Buffer) {
   return {

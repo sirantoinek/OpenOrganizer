@@ -12,11 +12,11 @@
  * No part of OpenOrganizer, including this file, may be reproduced, modified, distributed, or otherwise used except in accordance with the terms specified in the LICENSE file.
  */
 import * as db from "../db/sqlite-db";
-import {syncdown} from "app/src-electron/services/syncdown";
-import {syncUp} from "app/src-electron/services/syncup";
-import {getDateNowBuffer} from "../utils/sync-utils";
-import {lastUpdated} from "app/src-electron/services/store";
-import type { RetrievedItems} from "app/src-electron/services/syncdown";
+import { syncdown } from "app/src-electron/services/syncdown";
+import { syncUp } from "app/src-electron/services/syncup";
+import { getDateNowBuffer } from "../utils/sync-utils";
+import { lastUpdated } from "app/src-electron/services/store";
+import type { RetrievedItems } from "app/src-electron/services/syncdown";
 import type {
   Note,
   Extension,

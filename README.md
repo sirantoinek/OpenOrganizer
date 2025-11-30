@@ -60,64 +60,43 @@ Our team has tested and uses PostgreSQL 17.4.
 It is required to set up PostgreSQL and get database access information to be able to pass to the `.env` file.
 
 1. `cd server`
-2. Create a file named `.env` here in `./server/` and fill in your data following this format:
+2. Create a file named `.env` here in `./server/` and fill in your data following this format (default values shown for optional fields):
 ```
 # optional: run only to be accessible from the local device
-LOCAL_ONLY="BOOLEAN"
-# required: whether to launch HTTPS, which then redirects HTTP requests to HTTPS
-HTTPS="BOOLEAN"
-# required: port to await HTTP requests
-SERVER_PORT_HTTP="PORT"
-# required if using HTTPS: port to await HTTPS requests
-SERVER_PORT_HTTPS="PORT"
-# required if using HTTPS: file name for the certificate
-SERVER_CRT="FILE_NAME"
-# required if using HTTPS: file name for the private key
-SERVER_KEY="FILE_NAME"
-# required: database address
-DB_HOST="ADDRESS"
-# required: database port
-DB_PORT="PORT"
-# required: database username
-DB_USER="USERNAME"
-# required: database password
-DB_PWD="PASSWORD"
-# optional: whether to refresh authentication token expiration time upon use
-TOKEN_EXPIRE_REFRESH="BOOLEAN"
-# optional: time in seconds for authentication tokens to expire
-TOKEN_EXPIRE_TIME="INTEGER"
-# optional: time in seconds between each time the server purges all expired tokens
-TOKEN_PURGE_INTERVAL="INTEGER"
-# optional: maximum number of transmitted records per syncup/syncdown request/response
-MAX_RECORD_COUNT="INTEGER"
-# optional: clears the database auth tables (users, tokens, lastUpdated) upon server launch
-CLEAR_DB_AUTH="BOOLEAN"
-# optional: clears all other database tables upon server launch
-CLEAR_DB_DATA="BOOLEAN"
-# optional: runs the automated testing suite upon launch (WARNING: CLEARS DATABASE)
-TEST_SUITE="BOOLEAN"
-# optional: delay in seconds before the testing suite begins to avoid accidental data deletion
-TEST_SUITE_DELAY="INTEGER"
-```
-Example using default values for optional fields:
-```
 LOCAL_ONLY="FALSE"
+# required: whether to launch HTTPS, which then redirects HTTP requests to HTTPS
 HTTPS="FALSE"
+# required: port to await HTTP requests
 SERVER_PORT_HTTP="3001"
+# required if using HTTPS: port to await HTTPS requests
 SERVER_PORT_HTTPS="3003"
+# required if using HTTPS: file name for the certificate
 SERVER_CRT="server.crt"
+# required if using HTTPS: file name for the private key
 SERVER_KEY="server.key"
+# required: database address
 DB_HOST="localhost"
+# required: database port
 DB_PORT="3002"
+# required: database username
 DB_USER="postgres"
+# required: database password
 DB_PWD="password"
+# optional: whether to refresh authentication token expiration time upon use
 TOKEN_EXPIRE_REFRESH="TRUE"
+# optional: integer time in seconds for authentication tokens to expire
 TOKEN_EXPIRE_TIME="3600"
+# optional: integer time in seconds between each time the server purges all expired tokens
 TOKEN_PURGE_INTERVAL="3600"
+# optional: integer maximum number of transmitted records per syncup/syncdown request/response
 MAX_RECORD_COUNT="1000"
+# optional: clears the database auth tables (users, tokens, lastUpdated) upon server launch
 CLEAR_DB_AUTH="FALSE"
+# optional: clears all other database tables upon server launch
 CLEAR_DB_DATA="FALSE"
+# optional: runs the automated testing suite upon launch (WARNING: CLEARS DATABASE)
 TEST_SUITE="FALSE"
+# optional: integer delay in seconds before the testing suite begins to avoid accidental data deletion
 TEST_SUITE_DELAY="20"
 ```
 3. To build / run the application:

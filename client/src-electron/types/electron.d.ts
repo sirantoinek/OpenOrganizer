@@ -1,7 +1,7 @@
 /*
  * Authors: Kevin Sirantoine, Rachel Patella, Maria Pasaylo
  * Created: 2025-09-10
- * Updated: 2025-11-12
+ * Updated: 2025-11-28
  *
  * This file declares sqliteAPI and electronStoreAPI for the renderer.
  *
@@ -89,21 +89,10 @@ declare global {
       deleteGeneratedRemindersById: (itemID: bigint) => Promise<void>;
       deleteOverridesByLinkedId: (linkedItemID: bigint) => Promise<void>;
       clearAllTables: () => Promise<void>;
-
-      // Example functions
-      sqliteRead: (key: string) => Promise<string>;
-      sqliteCreate: (key: string, value: string) => Promise<boolean>;
-      sqliteUpdate: (key: string, value: string) => Promise<boolean>;
-      sqliteDelete: (key: string) => Promise<boolean>;
     };
 
     syncAPI: {
       sync: () => Promise<void>;
-    };
-
-    electronStoreAPI: {
-      getStoreName: () => Promise<string>;
-      setStoreName: (name: string) => Promise<boolean>;
     };
 
     electronAuthAPI: {
@@ -112,6 +101,11 @@ declare global {
       changeLogin:(username: string, password: string) => Promise<{ success: boolean}>;
       clearLocalData: () => Promise<boolean>;
       isUserLoggedIn: () => Promise<boolean>;
+    }
+
+    electronValidateAPI: {
+      validateUsername: (username: string) => Promise<string>;
+      validatePassword: (password: string) => Promise<string>;
     }
   }
 }

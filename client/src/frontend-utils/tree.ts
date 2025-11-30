@@ -1,7 +1,7 @@
 /*
- * Authors: Rachel Patella
+ * Authors: Rachel Patella, Maria Pasaylo
  * Created: 2025-10-23
- * Updated: 2025-10-29
+ * Updated: 2025-11-26
  *
  * This file contains functions to create the file explorer tree structure and breadcrumb trail path
  *
@@ -34,6 +34,17 @@ export function nest(items: UIFolder[], id: bigint): UIFolder[] {
     }));
 }
 
+export function convertInttoHex(colorInt: bigint | number | undefined): string {
+  if (colorInt === undefined || colorInt < 0) {
+    return '#459dd8'; // Default to folder color to blue
+  }
+
+  //convert integer to hexadecimal string and pad with leading zeros if necessary
+  const hexColor= colorInt.toString(16).padStart(6, '0')
+  return `#${hexColor}`;
+}
+
+
 // Function to convert nested folder tree to Q-Tree format
 export function convertFolderTreetoQTree(folders: UIFolder[], notes: UINote[], reminders: UIReminder[]): QTreeFolder[] {
   return folders.map(folder => {
@@ -46,12 +57,15 @@ export function convertFolderTreetoQTree(folders: UIFolder[], notes: UINote[], r
       return {
         label: note.title,
         icon: 'note',
+        iconColor: convertInttoHex(folder.colorCode),
+        iconStyle: { color: convertInttoHex(folder.colorCode)  },
         id: -itemIDBig, // Use negative bigint to distinguish notes and reminders from folders
       };
     });
 
     // Find reminders saved in the current folder
-    const remindersInCurrFolder = reminders.filter(reminder => reminder.folderID === folder.folderID && reminder.isSaved);
+    // Do not show generated in file explorer
+    const remindersInCurrFolder = reminders.filter(reminder => reminder.folderID === folder.folderID && reminder.isSaved && !reminder.isGenerated);
 
     // For each reminder, create a QTree node with label and id properties and return it
     const reminderTreeNodes = remindersInCurrFolder.map((reminder) => {
@@ -59,6 +73,8 @@ export function convertFolderTreetoQTree(folders: UIFolder[], notes: UINote[], r
       return {
         label: reminder.title,
         icon: 'alarm',
+        iconColor: convertInttoHex(folder.colorCode),
+        iconStyle: { color: convertInttoHex(folder.colorCode)  },
         id: -itemIDBig,
       };
     });
@@ -68,8 +84,8 @@ export function convertFolderTreetoQTree(folders: UIFolder[], notes: UINote[], r
       label: folder.folderName,
       id: folder.folderID,
       icon: 'folder',
-      iconColor: 'blue',
-       iconStyle: { color: 'blue' },
+      iconColor: convertInttoHex(folder.colorCode),
+       iconStyle: { color: convertInttoHex(folder.colorCode) },
       children: [
         ...noteTreeNodes,
         ...reminderTreeNodes,
@@ -95,7 +111,7 @@ export function buildRootNodes(folders: UIFolder[],notes: UINote[], reminders: U
     id: -note.itemID,
   }));
 
-  const reminderRootNodes = reminders.filter(reminder => reminder.isSaved && reminder.folderID === 0n).
+  const reminderRootNodes = reminders.filter(reminder => reminder.isSaved && reminder.folderID === 0n && !reminder.isGenerated).
   map(reminder => ({
     label: reminder.title,
     icon: 'alarm',

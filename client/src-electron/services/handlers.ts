@@ -1,7 +1,7 @@
 /*
  * Authors: Kevin Sirantoine, Rachel Patella, Maria Pasaylo, Michael Jagiello
  * Created: 2025-09-25
- * Updated: 2025-11-16
+ * Updated: 2025-11-28
  *
  * This file declares ipcMain handlers for APIs exposed in electron-preload and exports them via registerHandlers() to electron-main.
  *
@@ -11,7 +11,6 @@
  */
 import { ipcMain } from "electron";
 import * as db from "app/src-electron/db/sqlite-db";
-import { store } from "app/src-electron/services/store";
 import type {
   Note,
   Folder,
@@ -24,15 +23,16 @@ import type {
   Deleted,
   RangeWindow
 } from "app/src-electron/types/shared-types";
-import { createAccount, loginAccount, isUserLoggedIn, changeLogin, clearLocalData} from "./auth";
+import { createAccount, loginAccount, isUserLoggedIn, changeLogin, clearLocalData } from "./auth";
 import { sync } from "./sync";
 import * as notifs from "./notifs"
-// import schedule from 'node-schedule';
+import { ValidateUsername, ValidatePassword } from "app/src/utils/validate"
 
 export function registerHandlers()
 {
   // SQLite Handlers
   // create
+
   ipcMain.handle('createNote', (event, newNote: Note) => {
     db.createNote(newNote);
   });
@@ -284,37 +284,7 @@ export function registerHandlers()
     await sync();
   });
 
-  // Example Handlers
-
-  ipcMain.handle('sqliteRead', (event, key: string) => {
-    return db.read(key);
-  });
-
-  ipcMain.handle('sqliteCreate', (event, key: string, value: string) => {
-    db.create(key, value);
-    return true;
-  });
-
-  ipcMain.handle('sqliteUpdate', (event, key: string, value: string) => {
-    db.update(key, value);
-    return true;
-  });
-
-  ipcMain.handle('sqliteDelete', (event, key: string) => {
-    db.deleteEntry(key);
-    return true;
-  });
-
-  // electron-store Handlers
-
-  ipcMain.handle('getStoreName', () => {
-    return store.get('name');
-  });
-
-  ipcMain.handle('setStoreName', (event, name: string) => {
-    store.set('name', name);
-    return true;
-  });
+  // auth
 
   ipcMain.handle('createAccount', async (event, username: string, password:string)=> {
     return await createAccount(username, password);
@@ -334,5 +304,13 @@ export function registerHandlers()
 
   ipcMain.handle('clearLocalData', async (event) => {
     return await clearLocalData();
+  });
+
+  ipcMain.handle('validateUsername', (event, username: string) => {
+    return ValidateUsername(username);
+  });
+
+  ipcMain.handle('validatePassword', (event, password: string) => {
+    return ValidatePassword(password);
   });
 }

@@ -1,7 +1,7 @@
 /*
  * Authors: Kevin Sirantoine
  * Created: 2025-09-25
- * Updated: 2025-11-16
+ * Updated: 2025-11-28
  *
  * This file contains and exports all SQL statements used by sqlite-db.
  *
@@ -632,16 +632,3 @@ WHERE itemID = ?`;
 export const deleteOverridesByLinkedIdStmt = `
 DELETE FROM overrides
 WHERE linkedItemID = ?`;
-
-// Example SQL
-
-export const createExTable = `
-  CREATE TABLE IF NOT EXISTS example (
-    id VARCHAR(32),
-    value VARCHAR(32)
-  )`;
-
-export const createExEntry = "INSERT INTO example (id, value) VALUES (?, ?)";
-export const readExEntry = "SELECT value FROM example WHERE id = ?";
-export const updateExEntry = "UPDATE example SET value = ? WHERE id = ?";
-export const deleteExEntry = "DELETE FROM example WHERE id = ?";

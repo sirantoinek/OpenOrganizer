@@ -21,8 +21,8 @@ import type {
   Override,
   Deleted
 } from "app/src-electron/types/shared-types";
-import {encrypt} from "app/src-electron/services/crypto";
-import {getPrivateKey1} from "app/src-electron/services/auth";
+import { encrypt } from "app/src-electron/services/crypto";
+import { getPrivateKey1 } from "app/src-electron/services/auth";
 
 export function packNotes(notes: Note[]) {
   const repeatedData = Buffer.alloc(notes.length * 144);
@@ -206,7 +206,7 @@ export function packMonthlyReminders(monthlyReminders: MonthlyReminder[]) {
     encrBufPos += 4;
     encrData.write(monthlyReminders[i]!.title, encrBufPos);
 
-    encrypt(encrData, getPrivateKey1(), getPrivateKey1()).copy(repeatedData, bufPos);;
+    encrypt(encrData, getPrivateKey1(), getPrivateKey1()).copy(repeatedData, bufPos);
     bufPos += encrData.length;
   }
   return repeatedData;
@@ -247,7 +247,7 @@ export function packYearlyReminders(yearlyReminders: YearlyReminder[]) {
     encrBufPos += 2;
     encrData.write(yearlyReminders[i]!.title, encrBufPos);
 
-    encrypt(encrData, getPrivateKey1(), getPrivateKey1()).copy(repeatedData, bufPos);;
+    encrypt(encrData, getPrivateKey1(), getPrivateKey1()).copy(repeatedData, bufPos);
     bufPos += encrData.length;
   }
   return repeatedData;

@@ -1,6 +1,8 @@
 # OpenOrganizer
 A cross-platform desktop reminder and note-taking calendar application built with user control, complete data ownership, and security as core principles.
 
+<img src="/doc/OpenOrganizer_Screenshot.png" width="700" alt="OpenOrganizer Screenshot">
+
 ## Features:
 * Cross-platform support (Windows & Linux)
 * Store data with opt-in cloud syncing for easy remote backup and use between multiple devices

@@ -44,6 +44,10 @@
             :disable="isLoading"
             no-caps 
             label="Login"/>
+            <q-btn class="login-register-button" 
+            style="font-size: 15px"
+            @click= "router.push('/calendar')" no-caps
+            label="Home Page"/>
         </div>
     </qpage>
 </template>

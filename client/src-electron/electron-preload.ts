@@ -31,7 +31,7 @@
  *
  * Authors: Kevin Sirantoine, Rachel Patella, Maria Pasaylo
  * Created: 2025-04-13
- * Updated: 2025-11-28
+ * Updated: 2025-12-02
  *
  * This file exposes APIs to the renderer via the contextBridge.
  *
@@ -120,7 +120,8 @@ contextBridge.exposeInMainWorld('sqliteAPI', {
 });
 
 contextBridge.exposeInMainWorld('syncAPI', {
-  sync: (): Promise<void> => ipcRenderer.invoke('sync')
+  sync: (): Promise<void> => ipcRenderer.invoke('sync'),
+  setServerAddress: (serverAddr: string): Promise<void> => ipcRenderer.invoke('setServerAddress', serverAddr)
 });
 
 contextBridge.exposeInMainWorld('electronAuthAPI', {

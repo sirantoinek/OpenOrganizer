@@ -1,11 +1,10 @@
 /*
  * Authors: Kevin Sirantoine
  * Created: 2025-10-30
- * Updated: 2025-11-13
+ * Updated: 2025-12-02
  *
  * This file contains a function that manages the full sync operation including syncdown, syncup, lastUpdated, and
  * insertion of retrieved items into the local database.
- *
  *
  * This file is a part of OpenOrganizer.
  * This file and all source code within it are governed by the copyright and license terms outlined in the LICENSE file located in the top-level directory of this distribution.
@@ -15,7 +14,7 @@ import * as db from "../db/sqlite-db";
 import { syncdown } from "app/src-electron/services/syncdown";
 import { syncUp } from "app/src-electron/services/syncup";
 import { getDateNowBuffer } from "../utils/sync-utils";
-import { lastUpdated } from "app/src-electron/services/store";
+import { lastUpdated, serverAddress } from "app/src-electron/services/store";
 import type { RetrievedItems } from "app/src-electron/services/syncdown";
 import type {
   Note,
@@ -31,8 +30,9 @@ import type {
 } from "app/src-electron/types/shared-types";
 
 export async function sync() {
-  const retrievedItems = await syncdown();
-  await syncUp();
+  const serverAddr = serverAddress.get('serverAddress');
+  const retrievedItems = await syncdown(serverAddr);
+  await syncUp(serverAddr);
 
   const dateNowBuffer = getDateNowBuffer();
   lastUpdated.set('lastUpNotes', dateNowBuffer);

@@ -1,7 +1,7 @@
 /*
  * Authors: Maria Pasaylo, Kevin Sirantoine
  * Created: 2025-10-07
- * Updated: 2025-11-28
+ * Updated: 2025-12-02
  *
  * This file contains functions related to user authentication including getters
  * and setters for privateKey, username, password, and authToken.
@@ -16,10 +16,8 @@ import { hash256, hash512_256, generatePrivateKey, encrypt, decrypt } from "app/
 import Store from 'electron-store';
 import type { Schema } from 'electron-store';
 import axios from 'axios';
-import fs from 'fs';
-import path from "path";
-import { app } from 'electron';
 import { clearAllTables } from "app/src-electron/db/sqlite-db";
+import { serverAddress } from './store';
 
 interface Account{
   username: string;
@@ -123,23 +121,6 @@ export function setAutoSyncEnabled(autoSync : boolean) {
   accountStore.set('autoSyncEnabled', autoSync);
 }
 
-function getServerURL():string {
-  //in dev file is in project /public folder
-  const devPath = path.join(app.getAppPath(), '..', '..', 'public', 'serveraddress.txt');
-
-  let filePath: string;
-  if (fs.existsSync(devPath))
-    {
-      filePath = devPath;
-    }
-  else
-    {
-      throw new Error("serveraddress.txt not found in dev path");
-    }
-  const url = fs.readFileSync(filePath, 'utf-8').trim();
-  return url;
-}
-
 
 export async function createAccount(username : string, password : string): Promise<boolean> {
   // hash password, generate and store privateKey, encrypt privateKey with SHA256(password)
@@ -166,7 +147,7 @@ export async function createAccount(username : string, password : string): Promi
 
   // Sending in raw data via API request to /register
   try{
-    const serverURL = getServerURL();
+    const serverURL = serverAddress.get('serverAddress');
     const response = await axios.post<ArrayBuffer>(`${serverURL}register`, userData, {
       'responseType': 'arraybuffer',
       headers:{'Content-Type': 'application/octet-stream'}
@@ -187,7 +168,7 @@ export async function createAccount(username : string, password : string): Promi
 
 
   } catch (error) {
-    console.error("Error registering account: ", error);
+    console.error("Error registering account.\n\n");
     return false;
   }
 
@@ -221,7 +202,7 @@ export async function createAccount(username : string, password : string): Promi
 
     //Sending in raw data via API request to /login
     try {
-      const serverURL = getServerURL();
+      const serverURL = serverAddress.get('serverAddress');
       const response = await axios.post<ArrayBuffer>(`${serverURL}login`, userData, {
         'responseType': 'arraybuffer',
         headers:{'Content-Type': 'application/octet-stream'}
@@ -248,7 +229,7 @@ export async function createAccount(username : string, password : string): Promi
       setAutoSyncEnabled(true);
 
     } catch (error){
-      console.error("Error logging into account: ", error);
+      console.error("Error logging into account.\n\n");
       return false;
     }
 
@@ -295,7 +276,7 @@ export async function createAccount(username : string, password : string): Promi
 
     //Sending in raw data via API request to /changelogin
     try {
-      const serverURL = getServerURL();
+      const serverURL = serverAddress.get('serverAddress');
       const response = await axios.post<ArrayBuffer>(`${serverURL}changelogin`, userData, {
         'responseType': 'arraybuffer',
         headers:{'Content-Type': 'application/octet-stream'}
@@ -315,7 +296,7 @@ export async function createAccount(username : string, password : string): Promi
 
 
     } catch (error){
-      console.error("Error changing username and password: ", error);
+      console.error("Error changing username and password.\n\n");
       return false;
     }
 

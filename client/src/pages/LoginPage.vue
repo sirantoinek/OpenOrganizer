@@ -1,7 +1,7 @@
 <!--
  * Authors: Rachel Patella, Maria Pasaylo
  * Created: 2025-09-22
- * Updated: 2025-11-28
+ * Updated: 2025-12-02
  *
  * This file is the login form for users to log in to a preexisting account that includes a sidebar with the application name and logo
  *

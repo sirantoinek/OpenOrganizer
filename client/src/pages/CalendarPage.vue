@@ -1498,7 +1498,6 @@ const isCloudOn = ref(false);
 const isSyncing = ref(false);
 const isLoggedIn = ref(false);
 const isCloudAvailable = computed(() => { return !isLoggedIn.value || isSyncing.value});
-console.log('const initialize', isLoggedIn.value);
 const syncStatusMessage = ref('Cloud Not Synced')
 
 // Function to handle toggling cloud sync on/off
@@ -2925,8 +2924,6 @@ async function load(){
 
 onMounted(async () => {
   isLoggedIn.value = await window.electronAuthAPI.isUserLoggedIn();
-  console.log('App mounted');
-  console.log('onMounted', isLoggedIn.value);
   isCloudOn.value = false;
   if (isLoggedIn.value) {
     // Since sync initiates on startup, set cloud toggle to on
@@ -4451,7 +4448,6 @@ async function logout()
             //close popup of Login options (i.e. change login and logout)
             showLoginOptions.value = false;
             isLoggedIn.value = false;
-            console.log('LOGUOUT FUNCTION', isLoggedIn.value);
             await router.push('/login');
         } 
     } catch (error) {
@@ -4463,7 +4459,6 @@ async function checkLoggedIn()
 {
   try{
     isLoggedIn.value = await window.electronAuthAPI.isUserLoggedIn();
-    console.log('checkLoggedIn FUNCTION', isLoggedIn.value);
     if (isLoggedIn.value) {
       showLoginOptions.value = true;
     } else {

@@ -1,7 +1,7 @@
 <!--
  * Authors: Rachel Patella, Maria Pasaylo
  * Created: 2025-09-22
- * Updated: 2025-10-27
+ * Updated: 2025-12-02
  *
  * This file is the registration form for a user to create a new account that includes a sidebar with the application name and logo
  *
@@ -67,7 +67,6 @@ const isLoading = ref(false);
 async function register() {
     //input validation
     const usernameValidation = await window.electronValidateAPI.validateUsername(username.value);
-    console.log("username validation: ", usernameValidation);
     if (usernameValidation != "") {
         $q.notify({
             type: 'negative',
@@ -91,7 +90,6 @@ async function register() {
         const result = await window.electronAuthAPI.createAccount(username.value, password.value);
        
         if(result){
-            console.log('Account creation result:', result);
             $q.notify({
                 type: 'positive',
                 message: 'Account successfully created!'

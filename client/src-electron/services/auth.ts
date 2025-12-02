@@ -17,7 +17,7 @@ import Store from 'electron-store';
 import type { Schema } from 'electron-store';
 import axios from 'axios';
 import { clearAllTables } from "app/src-electron/db/sqlite-db";
-import { serverAddress } from './store';
+import { serverAddress, lastUpdated, lastStart } from './store';
 
 interface Account{
   username: string;
@@ -309,6 +309,8 @@ export async function createAccount(username : string, password : string): Promi
 
   export async function clearLocalData(): Promise<boolean> { // WARNING: clears account data and drops local tables
     accountStore.clear();
+    lastUpdated.clear();
+    lastStart.clear();
     clearAllTables();
     return true;
   }

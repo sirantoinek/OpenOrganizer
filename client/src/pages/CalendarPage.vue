@@ -1,7 +1,7 @@
 <!--
  * Authors: Rachel Patella, Maria Pasaylo, Michael Jagiello
  * Created: 2025-09-22
- * Updated: 2025-11-28
+ * Updated: 2025-12-02
  *
  * This file is the main home page that includes the calendar view, notes/reminders list, 
  * and a file explorer as a 3 column grid layout.
@@ -44,6 +44,10 @@
             </div>
             <div v-if="settingsTab === 'cloud'">
               <q-toggle style="size:2px; font-size:18px" v-model="isCloudOn" label="Cloud Sync" @update:model-value="onToggleCloudSync" :disable="isSyncing"/>
+            </div>
+            <div v-if="settingsTab === 'local'" class="local-settings">
+              <q-input v-model="serverAddress" type="text" square filled placeholder="Server Address" />
+              <q-btn flat label="Save" @click=saveServerAddress v-close-popup />
             </div>
           </div>
         </q-card-section>
@@ -4407,6 +4411,7 @@ function onClickHeadWorkweek(data: Timestamp) {
 }
 
 // Account variables/functions
+const serverAddress = ref<string>('');
 const newUsername = ref<string>('');
 const newPassword = ref<string>('');
 const isPwd = ref(true);
@@ -4442,6 +4447,14 @@ async function checkLoggedIn()
   } catch (error) {
     console.error('Error checking login status:', error);
   }
+}
+
+async function saveServerAddress() {
+  await window.syncAPI.setServerAddress(serverAddress.value);
+  $q.notify({
+    type: 'positive',
+    message: "Server Address changed successfully."
+  });
 }
 
 async function saveLoginChanges() {

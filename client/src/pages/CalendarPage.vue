@@ -43,7 +43,7 @@
               </q-tabs>
             </div>
             <div v-if="settingsTab === 'cloud'">
-              <q-toggle style="size:2px; font-size:18px" v-model="isCloudOn" label="Cloud Sync" @update:model-value="onToggleCloudSync" :disable="isSyncing"/>
+              <q-toggle style="size:2px; font-size:18px" v-model="isCloudOn" label="Cloud Sync" @update:model-value="onToggleCloudSync" :disable="isCloudAvailable"/>
             </div>
             <div v-if="settingsTab === 'local'" class="local-settings">
               <q-input v-model="serverAddress" type="text" square filled placeholder="Server Address" />
@@ -228,7 +228,7 @@
      
       <!-- Left column - File Explorer bottom row-->
       <div style="grid-area: file-explorer-cloud; padding: 20px 30px; display: flex; border-top: 1px solid #adadadcc; align-items: center; gap: 8px;" data-area="file-explorer-cloud">
-        <q-btn class="sync-button" icon="sync" no-caps @click="onToggleCloudSync">Sync</q-btn>
+        <q-btn class="sync-button" icon="sync" no-caps @click="onToggleCloudSync" :disable="isCloudAvailable">Sync</q-btn>
         <div style="color: #474747; font-size: 1.15rem;">{{  syncStatusMessage }} </div>
         <q-icon :name="cloudIcon" size="20px" style="color: #474747" />
       </div>
@@ -1497,6 +1497,7 @@ const showChangeLogin = ref(false);
 const isCloudOn = ref(false);
 const isSyncing = ref(false);
 const isLoggedIn = ref(false);
+const isCloudAvailable = computed(() => { return !isLoggedIn.value || isSyncing.value});
 console.log('const initialize', isLoggedIn.value);
 const syncStatusMessage = ref('Cloud Not Synced')
 

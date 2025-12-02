@@ -43,7 +43,7 @@
               </q-tabs>
             </div>
             <div v-if="settingsTab === 'cloud'">
-              <q-toggle style="size:2px; font-size:18px" v-model="isCloudOn" label="Cloud Sync" @update:model-value="onToggleCloudSync" :disable="isSyncing"/>
+              <q-toggle style="size:2px; font-size:18px" v-model="isCloudOn" label="Cloud Sync" @update:model-value="onToggleCloudSync" :disable="isCloudAvailable"/>
             </div>
             <div v-if="settingsTab === 'local'" class="local-settings">
               <q-input v-model="serverAddress" type="text" square filled placeholder="Server Address" />
@@ -228,6 +228,7 @@
      
       <!-- Left column - File Explorer bottom row-->
       <div style="grid-area: file-explorer-cloud; padding: 20px 30px; display: flex; border-top: 1px solid #adadadcc; align-items: center; gap: 8px;" data-area="file-explorer-cloud">
+        <q-btn class="sync-button" icon="sync" no-caps @click="onToggleCloudSync" :disable="isCloudAvailable">Sync</q-btn>
         <div style="color: #474747; font-size: 1.15rem;">{{  syncStatusMessage }} </div>
         <q-icon :name="cloudIcon" size="20px" style="color: #474747" />
       </div>
@@ -1495,6 +1496,8 @@ const showLoginOptions = ref(false);
 const showChangeLogin = ref(false);
 const isCloudOn = ref(false);
 const isSyncing = ref(false);
+const isLoggedIn = ref(false);
+const isCloudAvailable = computed(() => { return !isLoggedIn.value || isSyncing.value});
 const syncStatusMessage = ref('Cloud Not Synced')
 
 // Function to handle toggling cloud sync on/off
@@ -1514,6 +1517,8 @@ async function onToggleCloudSync() {
 
   try {
     await window.syncAPI.sync();
+    await load();
+    // Since sync initiates on startup, set cloud toggle to on
     syncStatusMessage.value = 'Cloud Synced Successfully';
   } catch (error) {
     syncStatusMessage.value = 'Cloud Sync Failed';
@@ -2898,27 +2903,39 @@ async function loadNotes(year?: number) {
   }
 }
 
-onMounted(async () => {
+async function load(){
   // Add root folder if no folders exist on page load
-  await addRootFolder();
-  // Ensure folders array is populated from local DB on page load
-  folders.value = mapDBToUIFolder(await readAllFolders());
-  // Load all reminders and notes for file explorer tree
-  await loadReminders();
-  await loadNotes();
-  // Load recurring series for file explorer tree
-  await loadRecurringSeries();
-  // Load reminders for selected calendar date on startup for tab list
-  await loadRemindersForCalendarDate(selectedDate.value);
-  // Load reminders for the visible month for calendar events
-  await loadRemindersForMonth(selectedDate.value);
-  // Load generated reminders for visible and next month
-  await loadGeneratedReminders(selectedDate.value);
-  // Since sync initiates on startup, set cloud toggle to on
-  isCloudOn.value = true;
-  // Start initial sync on app load
-  await onToggleCloudSync();
+    await addRootFolder();
+    // Ensure folders array is populated from local DB on page load
+    folders.value = mapDBToUIFolder(await readAllFolders());
+    // Load all reminders and notes for file explorer tree
+    await loadReminders();
+    await loadNotes();
+    // Load recurring series for file explorer tree
+    await loadRecurringSeries();
+    // Load reminders for selected calendar date on startup for tab list
+    await loadRemindersForCalendarDate(selectedDate.value);
+    // Load reminders for the visible month for calendar events
+    await loadRemindersForMonth(selectedDate.value);
+    // Load generated reminders for visible and next month
+    await loadGeneratedReminders(selectedDate.value);
+}
+
+
+onMounted(async () => {
+  isLoggedIn.value = await window.electronAuthAPI.isUserLoggedIn();
+  isCloudOn.value = false;
+  if (isLoggedIn.value) {
+    // Since sync initiates on startup, set cloud toggle to on
+    isCloudOn.value = true;
+     // Start initial sync on app load
+    await onToggleCloudSync();
+  }else{
+    await load();
+  }
+ 
   });
+
 
 // Function to add a folder to the tree
 function addFolder() {
@@ -4417,9 +4434,11 @@ const newPassword = ref<string>('');
 const isPwd = ref(true);
 const $q = useQuasar();
 const router = useRouter();
+
 async function logout()
 {
   try {
+    await window.syncAPI.sync();
     const isDeleted: boolean = await window.electronAuthAPI.clearLocalData();
     if(isDeleted){
             $q.notify({
@@ -4428,6 +4447,7 @@ async function logout()
             });
             //close popup of Login options (i.e. change login and logout)
             showLoginOptions.value = false;
+            isLoggedIn.value = false;
             await router.push('/login');
         } 
     } catch (error) {
@@ -4438,8 +4458,8 @@ async function logout()
 async function checkLoggedIn()
 {
   try{
-    const isloggedIn: boolean = await window.electronAuthAPI.isUserLoggedIn();
-    if (isloggedIn) {
+    isLoggedIn.value = await window.electronAuthAPI.isUserLoggedIn();
+    if (isLoggedIn.value) {
       showLoginOptions.value = true;
     } else {
       await router.push('/register');

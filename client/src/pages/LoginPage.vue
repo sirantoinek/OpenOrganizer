@@ -1,7 +1,7 @@
 <!--
  * Authors: Rachel Patella, Maria Pasaylo
  * Created: 2025-09-22
- * Updated: 2025-11-28
+ * Updated: 2025-12-02
  *
  * This file is the login form for users to log in to a preexisting account that includes a sidebar with the application name and logo
  *
@@ -18,13 +18,13 @@
 -->
 
 <template>
-    <qpage class="login-registration-container"> 
+    <div class="login-registration-container"> 
         <div class="login-register-sidebar">
-            <h style="text-align: center; font-size: 50px; margin-top: -5px;">Welcome to<br>OpenOrganizer!</h>
+            <h1 style="text-align: center; font-size: 50px; margin-top: -5px;">Welcome to<br>OpenOrganizer!</h1>
             <q-icon style="font-size: 150px; margin-top: 50px;" name="event" />
         </div>
         <div class="login-registration-form">
-            <h style="text-align: center; font-size: 50px; margin-top: 30px; color: black; font-weight: bold; max-width: 400px;">Login</h>
+            <h1 style="text-align: center; font-size: 50px; margin-top: 30px; color: black; font-weight: bold; max-width: 400px;">Login</h1>
             <p style="font-size: 17px">Don't have an account yet? Sign up
                 <router-link to="/register">here</router-link>
             </p>
@@ -44,8 +44,12 @@
             :disable="isLoading"
             no-caps 
             label="Login"/>
+            <q-btn class="login-register-button" 
+            style="font-size: 15px"
+            @click= "router.push('/calendar')" no-caps
+            label="Home Page"/>
         </div>
-    </qpage>
+    </div>
 </template>
 
 
@@ -53,6 +57,7 @@
 import { ref } from 'vue';
 import { useQuasar } from 'quasar';
 import { useRouter } from 'vue-router';
+
 
 const router = useRouter();
 const $q = useQuasar();

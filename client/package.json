@@ -1,8 +1,8 @@
 {
-  "name": "open-organizer",
+  "name": "openorganizer",
   "version": "0.0.1",
-  "description": "Open Organizer",
-  "productName": "Open Organizer",
+  "description": "OpenOrganizer",
+  "productName": "OpenOrganizer",
   "author": "Michael Jagiello",
   "type": "module",
   "private": true,

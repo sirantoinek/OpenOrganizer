@@ -3,7 +3,7 @@
  *
  * Authors: Michael Jagiello, Kevin Sirantoine, Maria Pasaylo, Rachel Patella
  * Created: 2025-04-13
- * Updated: 2025-11-28
+ * Updated: 2025-12-01
  *
  * This file is the Electron main process entry point that creates the application window, manages the system tray icon,
  * and handles communication between the user interface and data storage (SQLite and electron-store).
@@ -84,7 +84,7 @@ void app.whenReady().then(async () => {
   const contextMenu = Menu.buildFromTemplate([
     { label: 'Quit', click: () => { app.quit(); } }
   ])
-    appIcon.setToolTip('Open Organizer');
+    appIcon.setToolTip('OpenOrganizer');
     appIcon.setContextMenu(contextMenu);
 
   appIcon.on('click', () => {

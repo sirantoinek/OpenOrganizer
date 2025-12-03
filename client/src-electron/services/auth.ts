@@ -1,7 +1,7 @@
 /*
  * Authors: Maria Pasaylo, Kevin Sirantoine
  * Created: 2025-10-07
- * Updated: 2025-12-02
+ * Updated: 2025-12-03
  *
  * This file contains functions related to user authentication including getters
  * and setters for privateKey, username, password, and authToken.
@@ -252,12 +252,13 @@ export async function createAccount(username : string, password : string): Promi
     const oldUsernameBuffer = Buffer.from(oldUsername).slice(0,32);
 
     //hash the passwords
+    const hashKeyNewPassword: Buffer = hash256(newPassword);
     const hashNewPassword: Buffer = hash512_256(newPassword);
     const hashOldPassword: Buffer = hash512_256(oldPassword);
 
     //get the private keys
-    const encrPrivateKey1: Buffer = getPrivateKey1();
-    const encrPrivateKey2: Buffer = getPrivateKey2();
+    const encrPrivateKey1: Buffer = encrypt(getPrivateKey1(), hashKeyNewPassword, hashKeyNewPassword);
+    const encrPrivateKey2: Buffer = encrypt(getPrivateKey2(), hashKeyNewPassword, hashKeyNewPassword);
 
     //Store username[0:32], passwordHash[32:64], newUsername[64:96], newPasswordHash[96:128],
     //privateKey1[128:160], privateKey2[160:192] to send to server
@@ -268,11 +269,6 @@ export async function createAccount(username : string, password : string): Promi
     hashNewPassword.copy(userData, 96);
     encrPrivateKey1.copy(userData, 128);
     encrPrivateKey2.copy(userData, 160);
-
-    //testing output
-    // console.log('CHANGE LOGIN USER DATA', userData.toString('utf8'));
-    // console.log('CHANGE LOGIN USER DATA RAW', userData);
-    // console.log('CHANGE LOGIN USER DATA LENGTH', userData.length);
 
     //Sending in raw data via API request to /changelogin
     try {

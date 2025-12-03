@@ -1,7 +1,7 @@
 /*
  * Authors: Michael Jagiello
  * Created: 2025-09-20
- * Updated: 2025-10-26
+ * Updated: 2025-12-03
  *
  * This file declares the database variable and includes databse interaction functions.
  * Included are for connecting to and closing the connection to the database, as well as functions for inserting into or selecting from.
@@ -216,7 +216,7 @@ func deleteRow(row models.RowDeleted) {
 	case foldersTable:
 		_, _ = db.Exec(deleteFolder, row.UserID, row.ItemID)
 	}
-	_, _ = db.Exec(deleteItem("extentions"), row.UserID, row.ItemID)
+	_, _ = db.Exec(deleteItem("extensions"), row.UserID, row.ItemID)
 }
 
 // syncdown

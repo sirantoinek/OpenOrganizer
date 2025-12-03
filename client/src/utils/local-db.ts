@@ -1,7 +1,7 @@
 /*
  * Authors: Kevin Sirantoine
  * Created: 2025-10-13
- * Updated: 2025-11-17
+ * Updated: 2025-12-03
  *
  * This file contains functions that perform CRUD operations on the local SQLite database through the IPC to provide
  * database access to the renderer process.
@@ -129,7 +129,7 @@ export async function createDailyReminder(
   }
   await window.sqliteAPI.createDailyReminder(newDailyRem);
   // Return timestamp ID of recurring reminder to use in frontend
-  return timeMs; 
+  return timeMs;
 }
 
 export async function createWeeklyReminder(
@@ -167,7 +167,7 @@ export async function createWeeklyReminder(
   }
   await window.sqliteAPI.createWeeklyReminder(newWeeklyRem);
   // Return timestamp ID of recurring reminder to use in frontend
-  return timeMs; 
+  return timeMs;
 }
 
 export async function createMonthlyReminder(
@@ -205,7 +205,7 @@ export async function createMonthlyReminder(
   }
   await window.sqliteAPI.createMonthlyReminder(newMonthlyRem);
   // Return timestamp ID of recurring reminder to use in frontend
-  return timeMs; 
+  return timeMs;
 }
 
 export async function createYearlyReminder(
@@ -248,7 +248,7 @@ export async function createYearlyReminder(
   }
   await window.sqliteAPI.createYearlyReminder(newYearlyRem);
   // Return timestamp ID of recurring reminder to use in frontend
-  return timeMs; 
+  return timeMs;
 }
 
 export async function createOrUpdateOverride(
@@ -326,6 +326,7 @@ export async function readNote(itemID: bigint) {
   const fullText = [note.text];
   if (note.extensions !== undefined) for (const ext of note.extensions) fullText.push(ext.data);
   note.text = fullText.join("");
+  note.text = note.text.replaceAll('\0', '');
 
   return note;
 }
@@ -365,6 +366,7 @@ export async function readNotesInRange(windowStartTime: Timestamp, windowEndTime
     const fullText = [note.text];
     if (note.extensions !== undefined) for (const ext of note.extensions) fullText.push(ext.data);
     note.text = fullText.join("");
+    note.text = note.text.replaceAll('\0', '');
   }
   return notes;
 }

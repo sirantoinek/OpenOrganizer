@@ -1,7 +1,7 @@
 /*
  * Authors: Kevin Sirantoine
  * Created: 2025-10-29
- * Updated: 2025-11-13
+ * Updated: 2025-12-03
  *
  * This file defines functions for converting byte arrays into interface arrays for use in parsing syncdown.ts responses.
  *
@@ -239,7 +239,7 @@ export function unpackExtensions(repeatedData: Buffer, recordCount: number) {
       itemID: itemID,
       lastModified: lastModified,
       sequenceNum: sequenceNum,
-      data: getStringFromBuf(decrData, 64)
+      data: decrData.toString('binary', 0, 64)
     };
   }
   return extensions;

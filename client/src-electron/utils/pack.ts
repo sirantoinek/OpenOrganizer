@@ -1,7 +1,7 @@
 /*
  * Authors: Kevin Sirantoine
  * Created: 2025-10-28
- * Updated: 2025-11-13
+ * Updated: 2025-12-03
  *
  * This file defines functions for converting interface arrays into byte arrays for use in syncup.ts POST requests.
  *
@@ -266,8 +266,7 @@ export function packExtensions(extensions: Extension[]) {
     bufPos += 4;
 
     // encrypted data
-    const encrData = Buffer.alloc(64);
-    encrData.write(extensions[i]!.data, 0);
+    const encrData = Buffer.from(extensions[i]!.data.padEnd(64, '\0'), 'binary');
 
     encrypt(encrData, getPrivateKey1(), getPrivateKey1()).copy(repeatedData, bufPos);
     bufPos += encrData.length

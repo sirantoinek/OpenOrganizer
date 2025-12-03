@@ -1,9 +1,9 @@
 // app global css in SCSS form
 
 /* 
- * Authors: Rachel Patella, Maria Pasaylo
+ * Authors: Rachel Patella, Maria Pasaylo, Michael Jagiello
  * Created: 2025-04-13
- * Updated: 2025-11-21
+ * Updated: 2025-12-02
  *
  * This file is the CSS global stylesheet for the application
  *
@@ -178,6 +178,12 @@
   margin-top: auto;
 }
 
+.sync-button{
+  background-color: $primary;
+  color: white;
+  font-size: 15px;
+}
+
 .reminder-header-container {
   align-items: center;
   display: flex;
@@ -251,4 +257,12 @@ overflow-wrap: break-word;
 
 .my-picker {
   max-width: 600px;
+}
+
+.local-settings {
+  align-items: center;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-around;
+  padding: 1rem;
 }

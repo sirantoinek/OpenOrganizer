@@ -1,7 +1,7 @@
 /*
  * Authors: Kevin Sirantoine, Rachel Patella, Maria Pasaylo, Michael Jagiello
  * Created: 2025-09-25
- * Updated: 2025-11-28
+ * Updated: 2025-12-02
  *
  * This file declares ipcMain handlers for APIs exposed in electron-preload and exports them via registerHandlers() to electron-main.
  *
@@ -27,6 +27,7 @@ import { createAccount, loginAccount, isUserLoggedIn, changeLogin, clearLocalDat
 import { sync } from "./sync";
 import * as notifs from "./notifs"
 import { ValidateUsername, ValidatePassword } from "app/src/utils/validate"
+import { serverAddress } from "app/src-electron/services/store";
 
 export function registerHandlers()
 {
@@ -282,6 +283,10 @@ export function registerHandlers()
 
   ipcMain.handle('sync', async (event) => {
     await sync();
+  });
+
+  ipcMain.handle('setServerAddress', async (event, serverAddr: string) => {
+    serverAddress.set('serverAddress', serverAddr);
   });
 
   // auth

@@ -3,7 +3,7 @@
  *
  * Authors: Michael Jagiello, Kevin Sirantoine, Maria Pasaylo, Rachel Patella
  * Created: 2025-04-13
- * Updated: 2025-11-28
+ * Updated: 2025-12-02
  *
  * This file is the Electron main process entry point that creates the application window, manages the system tray icon,
  * and handles communication between the user interface and data storage (SQLite and electron-store).
@@ -19,7 +19,6 @@ import os from 'os';
 import { fileURLToPath } from 'url'
 import { registerHandlers } from "./services/handlers";
 import { sync } from "./services/sync";
-import * as fs from "node:fs";
 import { getAutoSyncEnabled } from "app/src-electron/services/auth";
 import { InitNotifications } from "./services/notifs";
 import { generateAllInYear, getGeneratedYears } from "./services/generate"
@@ -31,7 +30,6 @@ import type { GeneratedReminder } from "app/src-electron/types/shared-types";
 const platform = process.platform || os.platform();
 
 const currentDir = fileURLToPath(new URL('.', import.meta.url));
-export let serverAddress = "";
 
 let mainWindow: BrowserWindow | undefined;
 let appIcon: Tray | undefined;
@@ -84,7 +82,7 @@ void app.whenReady().then(async () => {
   const contextMenu = Menu.buildFromTemplate([
     { label: 'Quit', click: () => { app.quit(); } }
   ])
-    appIcon.setToolTip('Open Organizer');
+    appIcon.setToolTip('OpenOrganizer');
     appIcon.setContextMenu(contextMenu);
 
   appIcon.on('click', () => {
@@ -111,7 +109,6 @@ app.on('activate', () => {
 function init() {
   registerHandlers(); // Registers all ipcMain handlers for APIs exposed in electron-preload
   initGeneratedTable();
-  serverAddress = fs.readFileSync(path.join(app.getAppPath(), '../../public/serveraddress.txt'), 'utf8');
   if (getAutoSyncEnabled()) void sync(); // sync on startup if autoSyncEnabled is true
   InitNotifications();
 }

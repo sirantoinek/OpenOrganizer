@@ -1,7 +1,7 @@
 /*
  * Authors: Maria Pasaylo, Kevin Sirantoine
  * Created: 2025-09-17
- * Updated: 2025-11-28
+ * Updated: 2025-12-02
  *
  * This module manages user data storage that persists between app sessions.
  * Data is stored in config.json in user data directory (e.g. C:\Users\<your username>\AppData\Roaming\Electron).
@@ -99,4 +99,21 @@ const lastStartSchema: Schema<LastStart> = {
 export const lastStart = new Store<LastStart>({
   name: 'lastStart',
   schema: lastStartSchema
+});
+
+// storing ServerAddress for use in syncing
+interface ServerAddress {
+  serverAddress: string
+}
+
+const serverAddressSchema: Schema<ServerAddress> = {
+  serverAddress: {
+    type: 'string',
+    default: "http://localhost:3001/"
+  }
+};
+
+export const serverAddress = new Store<ServerAddress>({
+  name: 'serverAddress',
+  schema: serverAddressSchema
 });

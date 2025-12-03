@@ -1,7 +1,7 @@
 /*
  * Authors: Kevin Sirantoine
  * Created: 2025-10-30
- * Updated: 2025-11-12
+ * Updated: 2025-12-02
  *
  * This file defines helper functions used by both syncup.ts and syncdown.ts.
  *
@@ -19,12 +19,12 @@ export async function sendRequest(url: string, body: Buffer) {
     });
   }
   catch (error) {
-    console.error('sync error: ', error);
+    console.error('sync error\n\n');
   }
 }
 
 export function logResponse(url: string, response: Axios.AxiosXHR<unknown>): void {
-  console.log('URL: ', url)
+  console.log('URL: ', url);
   console.log('Status: ', response.status);
   console.log('Status Text: ', response.statusText);
 }

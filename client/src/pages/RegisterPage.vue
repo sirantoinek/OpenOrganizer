@@ -1,7 +1,7 @@
 <!--
  * Authors: Rachel Patella, Maria Pasaylo
  * Created: 2025-09-22
- * Updated: 2025-10-27
+ * Updated: 2025-12-02
  *
  * This file is the registration form for a user to create a new account that includes a sidebar with the application name and logo
  *
@@ -17,13 +17,13 @@
  * specified in the LICENSE file.
 -->
 <template>
-    <qpage class="login-registration-container" > 
+    <div class="login-registration-container"> 
         <div class="login-register-sidebar">
-            <h style="text-align: center; font-size: 50px;  margin-top: -5px;">Welcome to<br>OpenOrganizer!</h>
+            <h1 style="text-align: center; font-size: 50px;  margin-top: -5px;">Welcome to<br>OpenOrganizer!</h1>
             <q-icon style="font-size: 150px; margin-top: 50px;" name="event" />
         </div>
         <div class="login-registration-form">
-            <h style="text-align: center; font-size: 50px; margin-top: 30px; color: black; font-weight: bold; max-width: 400px;">Create Account</h>
+            <h1 style="text-align: center; font-size: 50px; margin-top: 30px; color: black; font-weight: bold; max-width: 400px;">Create Account</h1>
             <p style="font-size: 17px">Already have an account? Login
                 <router-link to="/login">here</router-link>
             </p>
@@ -43,8 +43,12 @@
             :disable="isLoading"
             no-caps 
             label="Sign up"/>
+            <q-btn class="login-register-button" 
+            style="font-size: 15px"
+            @click= "router.push('/calendar')" no-caps
+            label="Home Page"/>
         </div>
-    </qpage>
+    </div>
 </template>
 
 
@@ -63,7 +67,6 @@ const isLoading = ref(false);
 async function register() {
     //input validation
     const usernameValidation = await window.electronValidateAPI.validateUsername(username.value);
-    console.log("username validation: ", usernameValidation);
     if (usernameValidation != "") {
         $q.notify({
             type: 'negative',
@@ -87,7 +90,6 @@ async function register() {
         const result = await window.electronAuthAPI.createAccount(username.value, password.value);
        
         if(result){
-            console.log('Account creation result:', result);
             $q.notify({
                 type: 'positive',
                 message: 'Account successfully created!'

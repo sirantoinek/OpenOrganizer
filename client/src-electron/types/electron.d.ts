@@ -1,7 +1,7 @@
 /*
  * Authors: Kevin Sirantoine, Rachel Patella, Maria Pasaylo
  * Created: 2025-09-10
- * Updated: 2025-11-28
+ * Updated: 2025-12-02
  *
  * This file declares sqliteAPI and electronStoreAPI for the renderer.
  *
@@ -93,6 +93,7 @@ declare global {
 
     syncAPI: {
       sync: () => Promise<void>;
+      setServerAddress: (serverAddr: string) => Promise<void>;
     };
 
     electronAuthAPI: {

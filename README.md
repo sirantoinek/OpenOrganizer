@@ -40,20 +40,15 @@ To clone the repository, just use the standard `git clone LINK` and `cd OpenOrga
 2. `npm install`
 3. `npm run rebuild`
 4. `npm install -g @quasar/cli`
-5. Create a file named `serveraddress.txt` in `./client/public/` following this format:
-```
-SERVER_ADDRESS
-```
-Example:
-```
-http://localhost:3001/
-```
-Note: If running the testing suite, also make a file named `testing.txt` containing `TRUE` in the same directory.
 
-6. To build and run the application:
+Note: If running the testing suite, make a file named `testing.txt` containing `TRUE` in the `./client/public/` directory.
+
+5. To build and run the application:
 * `quasar dev` to run in the browser **(UI testing only)**
 * `quasar dev -m electron` to build and run a dev version of the application
 * `quasar build -m electron` to build executable
+
+6. Once in the application, go to the settings icon in the bottom right, navigate to the LOCAL submenu, and input the server address and save. Ensure that this is the full address, including the `http://` prefix and `/` suffix.
 
 ## Server Setup Instructions
 

@@ -44,7 +44,6 @@ To clone the repository, just use the standard `git clone LINK` and `cd OpenOrga
 Note: If running the testing suite, make a file named `testing.txt` containing `TRUE` in the `./client/public/` directory.
 
 5. To build and run the application:
-* `quasar dev` to run in the browser **(UI testing only)**
 * `quasar dev -m electron` to build and run a dev version of the application
 * `quasar build -m electron` to build executable
 

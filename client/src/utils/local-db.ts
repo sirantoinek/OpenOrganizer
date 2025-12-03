@@ -1,7 +1,7 @@
 /*
  * Authors: Kevin Sirantoine
  * Created: 2025-10-13
- * Updated: 2025-11-07
+ * Updated: 2025-12-03
  *
  * This file contains functions that perform CRUD operations on the local SQLite database through the IPC to provide
  * database access to the renderer process.
@@ -26,6 +26,7 @@ import type {
   WeeklyReminder,
   MonthlyReminder,
   YearlyReminder,
+  Override,
   Deleted,
   RangeWindow
 } from "app/src-electron/types/shared-types";
@@ -127,6 +128,8 @@ export async function createDailyReminder(
     newDailyRem.extensions = extensions;
   }
   await window.sqliteAPI.createDailyReminder(newDailyRem);
+  // Return timestamp ID of recurring reminder to use in frontend
+  return timeMs;
 }
 
 export async function createWeeklyReminder(
@@ -163,6 +166,8 @@ export async function createWeeklyReminder(
     newWeeklyRem.extensions = extensions;
   }
   await window.sqliteAPI.createWeeklyReminder(newWeeklyRem);
+  // Return timestamp ID of recurring reminder to use in frontend
+  return timeMs;
 }
 
 export async function createMonthlyReminder(
@@ -199,14 +204,16 @@ export async function createMonthlyReminder(
     newMonthlyRem.extensions = extensions;
   }
   await window.sqliteAPI.createMonthlyReminder(newMonthlyRem);
+  // Return timestamp ID of recurring reminder to use in frontend
+  return timeMs;
 }
 
 export async function createYearlyReminder(
   folderID: bigint, eventType: number, seriesStartTime: Timestamp, seriesEndTime: Timestamp, timeOfDayMin: number, eventDurationMin: number,
-  notifOffsetTimeMin: number, hasNotifs: boolean, recurTime: Timestamp, title: string, extensions?: Extension[]) {
+  notifOffsetTimeMin: number, hasNotifs: boolean, recurDay: Timestamp, title: string, extensions?: Extension[]) {
   const timeMs: bigint = BigInt(Date.now());
-  let dayOfYear = getDayOfYear(recurTime);
-  if (isLeapYear(recurTime.year))
+  let dayOfYear = getDayOfYear(recurDay);
+  if (isLeapYear(recurDay.year))
   {
     if (dayOfYear === 60) dayOfYear = 366; // set to 366 if dayOfYear is leap day
     else if (dayOfYear > 60) dayOfYear -= 1;
@@ -240,6 +247,40 @@ export async function createYearlyReminder(
     newYearlyRem.extensions = extensions;
   }
   await window.sqliteAPI.createYearlyReminder(newYearlyRem);
+  // Return timestamp ID of recurring reminder to use in frontend
+  return timeMs;
+}
+
+export async function createOrUpdateOverride(
+  linkedItemID: bigint, origEventStartTime: Timestamp, eventStartTime: Timestamp, eventEndTime: Timestamp,
+  notifTime: Timestamp, hasNotif: boolean) {
+  const timeMs: bigint = BigInt(Date.now());
+
+  const origEventStartYear = origEventStartTime.year;
+  const origEventStartDay = getDayOfYear(origEventStartTime);
+  const origEventStartMin = (origEventStartTime.hour * 60) + origEventStartTime.minute;
+  let itemID = await window.sqliteAPI.readOverrideID(linkedItemID, origEventStartYear, origEventStartDay, origEventStartMin);
+  if (itemID === undefined) itemID = timeMs;
+
+  const override: Override = {
+    itemID: itemID,
+    linkedItemID: linkedItemID,
+    lastModified: timeMs,
+    origEventStartYear: origEventStartYear,
+    origEventStartDay: origEventStartDay,
+    origEventStartMin: origEventStartMin,
+    eventStartYear: eventStartTime.year,
+    eventStartDay: getDayOfYear(eventStartTime),
+    eventStartMin: (eventStartTime.hour * 60) + eventStartTime.minute,
+    eventEndYear: eventEndTime.year,
+    eventEndDay: getDayOfYear(eventEndTime),
+    eventEndMin: (eventEndTime.hour * 60) + eventEndTime.minute,
+    notifYear: notifTime.year,
+    notifDay: getDayOfYear(notifTime),
+    notifMin: (notifTime.hour * 60) + notifTime.minute,
+    hasNotif: (hasNotif) ? 1 : 0
+  };
+  await window.sqliteAPI.createOrUpdateOverride(override);
 }
 
 export async function createFolder(parentFolderID: bigint, colorCode: number, folderName: string) { // -1 treated as no colorCode
@@ -285,6 +326,7 @@ export async function readNote(itemID: bigint) {
   const fullText = [note.text];
   if (note.extensions !== undefined) for (const ext of note.extensions) fullText.push(ext.data);
   note.text = fullText.join("");
+  note.text = note.text.replaceAll('\0', '');
 
   return note;
 }
@@ -324,6 +366,7 @@ export async function readNotesInRange(windowStartTime: Timestamp, windowEndTime
     const fullText = [note.text];
     if (note.extensions !== undefined) for (const ext of note.extensions) fullText.push(ext.data);
     note.text = fullText.join("");
+    note.text = note.text.replaceAll('\0', '');
   }
   return notes;
 }
@@ -361,6 +404,13 @@ export async function readYearlyRemindersInRange(windowStartTime: Timestamp, win
   const rangeWindow = calculateRangeWindow(windowStartTime, windowEndTime);
 
   return await window.sqliteAPI.readYearlyRemindersInRange(rangeWindow);
+}
+
+export async function readGeneratedRemindersInRange(windowStartTime: Timestamp, windowEndTime: Timestamp) {
+  if (diffTimestamp(windowStartTime, windowEndTime, false) < 0) return [];
+  const rangeWindow = calculateRangeWindow(windowStartTime, windowEndTime);
+
+  return await window.sqliteAPI.readGeneratedRemindersInRange(rangeWindow);
 }
 
 export async function readAllFolders() {
@@ -603,7 +653,6 @@ const dailyTable = 21;
 const weeklyTable = 22;
 const monthlyTable = 23;
 const yearlyTable = 24;
-const overridesTable = 31;
 const foldersTable = 32;
 
 export async function deleteItem(itemID: bigint, itemTable: number) { // used for all but specific extensions and folders
@@ -640,6 +689,11 @@ export async function deleteItem(itemID: bigint, itemTable: number) { // used fo
   if (deleteOccurred) {
     await window.sqliteAPI.deleteAllExtensions(itemID); // delete all extensions associated with deleted item
     await createDeleted(itemID, itemTable); // create deleted entry for the deleted item
+
+    if (Math.floor(itemTable / 10) === 2) { // itemTable = 2_ (recurring reminder)
+      await window.sqliteAPI.deleteGeneratedRemindersById(itemID);
+      await window.sqliteAPI.deleteOverridesByLinkedId(itemID);
+    }
   }
 }
 
@@ -679,7 +733,7 @@ export async function clearAllTables() {
 }
 
 // helpers
-export function calculateRangeWindow(windowStartTime: Timestamp, windowEndTime: Timestamp) { // used for readInRange
+function calculateRangeWindow(windowStartTime: Timestamp, windowEndTime: Timestamp) { // used for readInRange
   const startMinOfYear = getDayOfYear(windowStartTime) * 1440 + windowStartTime.hour * 60 + windowStartTime.minute;
   const endMinOfYear = getDayOfYear(windowEndTime) * 1440 + windowEndTime.hour * 60 + windowEndTime.minute;
 

@@ -1,7 +1,7 @@
 /*
  * Authors: Michael Jagiello
  * Created: 2025-11-04
- * Updated: 2025-11-04
+ * Updated: 2025-11-17
  *
  * This file handles important initialization features.
  *
@@ -14,13 +14,13 @@ import * as test from "./test"
 
 export async function init() {
     if (await FetchTestingBool() == true) {
-        test.TestingSuite();
+        await test.TestingSuite();
     }
 }
 
 // if testing.txt is available with TRUE inside, return true
 async function FetchTestingBool() {
-    let testing: string = ""; 
+    let testing: string = "";
     await fetch("testing.txt")
     .then((response) => response.text())
     .then((text) => {

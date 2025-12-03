@@ -1,7 +1,7 @@
 /*
  * Authors: Kevin Sirantoine, Michael Jagiello
  * Created: 2025-10-13
- * Updated: 2025-11-06
+ * Updated: 2025-11-07
  *
  * This file contains interfaces that are shared between the main and renderer processes to easily pass database entries and other values.
  *
@@ -143,6 +143,48 @@ export interface YearlyReminder {
   extensions?: Extension[];
 }
 
+export interface GeneratedReminder {
+  itemID: bigint;
+  folderID: bigint;
+  eventType: number;
+  recurrenceTable: number;
+  origEventStartYear: number;
+  origEventStartDay: number;
+  origEventStartMin: number;
+  eventStartYear: number;
+  eventStartDay: number;
+  eventStartMin: number;
+  eventEndYear: number;
+  eventEndDay: number;
+  eventEndMin: number;
+  notifYear: number;
+  notifDay: number;
+  notifMin: number;
+  isExtended: number;
+  hasNotif: number;
+  title: string;
+  extensions?: Extension[];
+}
+
+export interface Override {
+  itemID: bigint;
+  linkedItemID: bigint;
+  lastModified: bigint;
+  origEventStartYear: number;
+  origEventStartDay: number;
+  origEventStartMin: number;
+  eventStartYear: number;
+  eventStartDay: number;
+  eventStartMin: number;
+  eventEndYear: number;
+  eventEndDay: number;
+  eventEndMin: number;
+  notifYear: number;
+  notifDay: number;
+  notifMin: number;
+  hasNotif: number;
+}
+
 export interface Deleted {
   itemID: bigint;
   lastModified: bigint;
@@ -174,7 +216,7 @@ export interface Flight {
   boardingTimeMin: number;
   boardingGroup: string; // 2
   gate: string; // 4
-  depTimezoneOffset: string; // 1 
+  depTimezoneOffset: string; // 1
   arrTimezoneOffset: string; // 1
   arrAirportIATA: string; // 3
   arrTimezoneAbbr: string; // 5

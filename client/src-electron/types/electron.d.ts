@@ -1,10 +1,9 @@
 /*
  * Authors: Kevin Sirantoine, Rachel Patella, Maria Pasaylo
  * Created: 2025-09-10
- * Updated: 2025-11-07
+ * Updated: 2025-12-02
  *
  * This file declares sqliteAPI and electronStoreAPI for the renderer.
- *
  *
  * This file is a part of OpenOrganizer.
  * This file and all source code within it are governed by the copyright and license terms outlined in the LICENSE file located in the top-level directory of this distribution.
@@ -12,13 +11,13 @@
  */
 import type {
   Note,
-  Extension,
   Folder,
   Reminder,
   DailyReminder,
   WeeklyReminder,
   MonthlyReminder,
   YearlyReminder,
+  GeneratedReminder,
   Deleted,
   RangeWindow
 } from "app/src-electron/types/shared-types";
@@ -35,6 +34,7 @@ declare global {
       createWeeklyReminder: (newWeeklyRem: WeeklyReminder) => Promise<void>;
       createMonthlyReminder: (newMonthlyRem: MonthlyReminder) => Promise<void>;
       createYearlyReminder: (newYearlyRem: YearlyReminder) => Promise<void>;
+      createOrUpdateOverride: (override: Override) => Promise<void>;
       createFolder: (newFolder: Folder) => Promise<void>;
       createDeleted: (newDeleted: Deleted) => Promise<void>;
 
@@ -53,16 +53,19 @@ declare global {
       readWeeklyRemindersInRange: (rangeWindow: RangeWindow) => Promise<WeeklyReminder[]>;
       readMonthlyRemindersInRange: (rangeWindow: RangeWindow) => Promise<MonthlyReminder[]>;
       readYearlyRemindersInRange: (rangeWindow: RangeWindow) => Promise<YearlyReminder[]>;
+      readGeneratedRemindersInRange: (rangeWindow: RangeWindow) => Promise<GeneratedReminder[]>;
 
       readAllFolders: () => Promise<Folder[]>;
 
-      readNotesInFolder: (folderID: bigint) => Promise<bigint[]>
-      readRemindersInFolder: (folderID: bigint) => Promise<bigint[]>
-      readDailyRemindersInFolder: (folderID: bigint) => Promise<bigint[]>
-      readWeeklyRemindersInFolder: (folderID: bigint) => Promise<bigint[]>
-      readMonthlyRemindersInFolder: (folderID: bigint) => Promise<bigint[]>
-      readYearlyRemindersInFolder: (folderID: bigint) => Promise<bigint[]>
-      readFoldersInFolder: (parentFolderID: bigint) => Promise<bigint[]>
+      readNotesInFolder: (folderID: bigint) => Promise<bigint[]>;
+      readRemindersInFolder: (folderID: bigint) => Promise<bigint[]>;
+      readDailyRemindersInFolder: (folderID: bigint) => Promise<bigint[]>;
+      readWeeklyRemindersInFolder: (folderID: bigint) => Promise<bigint[]>;
+      readMonthlyRemindersInFolder: (folderID: bigint) => Promise<bigint[]>;
+      readYearlyRemindersInFolder: (folderID: bigint) => Promise<bigint[]>;
+      readFoldersInFolder: (parentFolderID: bigint) => Promise<bigint[]>;
+
+      readOverrideID: (linkedItemID: bigint, origEventStartYear: number, origEventStartDay: number, origEventStartMin: number) => Promise<bigint>;
 
       // update
       updateNote: (modNote: Note) => Promise<void>;
@@ -83,33 +86,27 @@ declare global {
       deleteExtension: (itemID: bigint, sequenceNum: number) => Promise<void>;
       deleteAllExtensions: (itemID: bigint) => Promise<void>;
       deleteFolder: (folderID: bigint) => Promise<boolean>;
+      deleteGeneratedRemindersById: (itemID: bigint) => Promise<void>;
+      deleteOverridesByLinkedId: (linkedItemID: bigint) => Promise<void>;
       clearAllTables: () => Promise<void>;
-
-      // Example functions
-      sqliteRead: (key: string) => Promise<string>;
-      sqliteCreate: (key: string, value: string) => Promise<boolean>;
-      sqliteUpdate: (key: string, value: string) => Promise<boolean>;
-      sqliteDelete: (key: string) => Promise<boolean>;
     };
 
     syncAPI: {
       sync: () => Promise<void>;
-    };
-
-    electronStoreAPI: {
-      getStoreName: () => Promise<string>;
-      setStoreName: (name: string) => Promise<boolean>;
+      setServerAddress: (serverAddr: string) => Promise<void>;
     };
 
     electronAuthAPI: {
       createAccount: (username: string, password: string) => Promise<{ success: boolean}>;
       loginAccount: (username: string, password: string) => Promise<{ success: boolean}>;
-      clearLocalData: () => Promise<void>;
+      changeLogin:(username: string, password: string) => Promise<{ success: boolean}>;
+      clearLocalData: () => Promise<boolean>;
+      isUserLoggedIn: () => Promise<boolean>;
     }
 
-    reminderNotificationAPI: {
-      showReminderNotification: (reminder: { title: string; date: string }) => Promise<boolean>;
-      scheduleReminderNotification: (reminder: { itemID: bigint; date: string; title: string; time?: string; unixMilliseconds?: number }) => Promise<boolean>;
-    };
+    electronValidateAPI: {
+      validateUsername: (username: string) => Promise<string>;
+      validatePassword: (password: string) => Promise<string>;
+    }
   }
 }

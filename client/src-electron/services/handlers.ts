@@ -1,44 +1,46 @@
 /*
- * Authors: Kevin Sirantoine, Rachel Patella, Maria Pasaylo
+ * Authors: Kevin Sirantoine, Rachel Patella, Maria Pasaylo, Michael Jagiello
  * Created: 2025-09-25
- * Updated: 2025-11-07
+ * Updated: 2025-12-02
  *
- * This file declares ipcMain handlers for APIs exposed in electron-preload and exports them via registerHandlers()
- * to electron-main.
+ * This file declares ipcMain handlers for APIs exposed in electron-preload and exports them via registerHandlers() to electron-main.
  *
  * This file is a part of OpenOrganizer.
  * This file and all source code within it are governed by the copyright and license terms outlined in the LICENSE file located in the top-level directory of this distribution.
  * No part of OpenOrganizer, including this file, may be reproduced, modified, distributed, or otherwise used except in accordance with the terms specified in the LICENSE file.
  */
-import {ipcMain, Notification} from "electron";
-import * as db from "../../src-electron/db/sqlite-db";
-import {store} from "app/src-electron/services/store";
+import { ipcMain } from "electron";
+import * as db from "app/src-electron/db/sqlite-db";
 import type {
   Note,
-  Extension,
   Folder,
   Reminder,
   DailyReminder,
   WeeklyReminder,
   MonthlyReminder,
   YearlyReminder,
+  Override,
   Deleted,
   RangeWindow
 } from "app/src-electron/types/shared-types";
-import { createAccount, loginAccount, clearLocalData} from "./auth";
+import { createAccount, loginAccount, isUserLoggedIn, changeLogin, clearLocalData } from "./auth";
 import { sync } from "./sync";
-// import schedule from 'node-schedule';
+import * as notifs from "./notifs"
+import { ValidateUsername, ValidatePassword } from "app/src/utils/validate"
+import { serverAddress } from "app/src-electron/services/store";
 
 export function registerHandlers()
 {
   // SQLite Handlers
   // create
+
   ipcMain.handle('createNote', (event, newNote: Note) => {
     db.createNote(newNote);
   });
 
   ipcMain.handle('createReminder', (event, newRem: Reminder) => {
     db.createReminder(newRem);
+    notifs.SetNotifReminder(newRem);
   });
 
   ipcMain.handle('createDailyReminder', (event, newDailyRem: DailyReminder) => {
@@ -57,6 +59,16 @@ export function registerHandlers()
     db.createYearlyReminder(newYearlyRem);
   });
 
+  ipcMain.handle('createOrUpdateOverride', (event, override: Override) => {
+    db.createOrUpdateOverride(override);
+    const reminders = db.readGeneratedReminders(override.itemID);
+    if (reminders !== undefined) {
+      for (const reminder of reminders) {
+        notifs.SetNotifGenerated(reminder);
+      }
+    }
+  });
+
   ipcMain.handle('createFolder', (event, newFolder: Folder) => {
     db.createFolder(newFolder);
   });
@@ -65,14 +77,17 @@ export function registerHandlers()
     db.createDeleted(newDeleted);
   });
 
-
   // read
+
   ipcMain.handle('readNote', (event, itemID: bigint) => {
     return db.readNote(itemID);
   });
 
   ipcMain.handle('readReminder', (event, itemID: bigint) => {
-    return db.readReminder(itemID);
+    const reminder = db.readReminder(itemID);
+    if (reminder == undefined) return undefined;
+    notifs.SetNotifReminder(reminder);
+    return reminder;
   });
 
   ipcMain.handle('readDailyReminder', (event, itemID: bigint) => {
@@ -96,12 +111,19 @@ export function registerHandlers()
   });
 
   // read in range
+
   ipcMain.handle('readNotesInRange', (event, windowStartMs: bigint, windowEndMs: bigint) => {
     return db.readNotesInRange(windowStartMs, windowEndMs);
   });
 
   ipcMain.handle('readRemindersInRange', (event, rangeWindow: RangeWindow) => {
-    return db.readRemindersInRange(rangeWindow);
+    const reminders = db.readRemindersInRange(rangeWindow);
+    if (reminders !== undefined) {
+      for (const reminder of reminders) {
+        notifs.SetNotifReminder(reminder);
+      }
+    }
+    return reminders;
   });
 
   ipcMain.handle('readDailyRemindersInRange', (event, rangeWindow: RangeWindow) => {
@@ -120,12 +142,23 @@ export function registerHandlers()
     return db.readYearlyRemindersInRange(rangeWindow);
   });
 
+  ipcMain.handle('readGeneratedRemindersInRange', (event, rangeWindow: RangeWindow) => {
+    const reminders = db.readGeneratedRemindersInRange(rangeWindow);
+    if (reminders == undefined) return undefined;
+    for (const reminder of reminders) {
+      notifs.SetNotifGenerated(reminder);
+    }
+    return reminders;
+  });
+
   // read all
+
   ipcMain.handle('readAllFolders', (event) => {
     return db.readAllFolders();
   });
 
   // read IDs based on folderID
+
   ipcMain.handle('readNotesInFolder', (event, folderID: bigint) => {
     return db.readNotesInFolder(folderID);
   });
@@ -154,14 +187,19 @@ export function registerHandlers()
     return db.readFoldersInFolder(parentFolderID);
   });
 
+  ipcMain.handle('readOverrideID', (event, linkedItemID: bigint, origEventStartYear: number, origEventStartDay: number, origEventStartMin: number) => {
+    return db.readOverrideID(linkedItemID, origEventStartYear, origEventStartDay, origEventStartMin);
+  });
 
   // update
+
   ipcMain.handle('updateNote', (event, modNote: Note) => {
     db.updateNote(modNote);
   });
 
   ipcMain.handle('updateReminder', (event, modRem: Reminder) => {
     db.updateReminder(modRem);
+    notifs.SetNotifReminder(modRem);
   });
 
   ipcMain.handle('updateDailyReminder', (event, modDailyRem: DailyReminder) => {
@@ -185,11 +223,13 @@ export function registerHandlers()
   });
 
   // delete
+
   ipcMain.handle('deleteNote', (event, itemID: bigint) => {
     return db.deleteNote(itemID);
   });
 
   ipcMain.handle('deleteReminder', (event, itemID: bigint) => {
+    notifs.DeleteNotif(itemID);
     return db.deleteReminder(itemID);
   });
 
@@ -221,102 +261,61 @@ export function registerHandlers()
     return db.deleteFolder(folderID);
   });
 
+  ipcMain.handle('deleteGeneratedRemindersById', (event, itemID: bigint) => {
+    const reminders = db.readGeneratedReminders(itemID);
+    if (reminders != undefined) {
+      for (const reminder of reminders) {
+        notifs.DeleteNotifGenerated(reminder);
+      }
+    }
+    db.deleteGeneratedRemindersById(itemID);
+  });
+
+  ipcMain.handle('deleteOverridesByLinkedId', (event, linkedItemID: bigint) => {
+    db.deleteOverridesByLinkedId(linkedItemID);
+  });
+
   ipcMain.handle('clearAllTables', (event) => {
     db.clearAllTables();
   });
 
   // sync
+
   ipcMain.handle('sync', async (event) => {
     await sync();
   });
 
-  // Example Handlers
-  ipcMain.handle('sqliteRead', (event, key: string) => {
-    return db.read(key);
+  ipcMain.handle('setServerAddress', async (event, serverAddr: string) => {
+    serverAddress.set('serverAddress', serverAddr);
   });
 
-  ipcMain.handle('sqliteCreate', (event, key: string, value: string) => {
-    db.create(key, value);
-    return true;
+  // auth
+
+  ipcMain.handle('createAccount', async (event, username: string, password:string)=> {
+    return await createAccount(username, password);
   });
 
-  ipcMain.handle('sqliteUpdate', (event, key: string, value: string) => {
-    db.update(key, value);
-    return true;
+  ipcMain.handle('loginAccount', async (event, username: string, password:string)=> {
+    return await loginAccount(username, password);
   });
 
-  ipcMain.handle('sqliteDelete', (event, key: string) => {
-    db.deleteEntry(key);
-    return true;
+  ipcMain.handle('changeLogin', async (event, username?: string, password?:string)=> {
+    return await changeLogin(username, password);
   });
 
-  // electron-store Handlers
-  ipcMain.handle('getStoreName', () => {
-    return store.get('name');
+  ipcMain.handle('isUserLoggedIn', async (event) => {
+    return await isUserLoggedIn();
   });
 
-  ipcMain.handle('setStoreName', (event, name: string) => {
-    store.set('name', name);
-    return true;
+  ipcMain.handle('clearLocalData', async (event) => {
+    return await clearLocalData();
   });
 
-  ipcMain.handle('showReminderNotification', (event, reminder: { title: string; date: string }) => {
-    // Show the reminder notification
-    new Notification({
-      title: 'Reminder',
-      body: `${reminder.title} is scheduled for ${reminder.date}`,
-    }).show();
-    return true;
+  ipcMain.handle('validateUsername', (event, username: string) => {
+    return ValidateUsername(username);
   });
 
-  // Schedule a reminder notification once at local timezone and specific date and time
-  ipcMain.handle('scheduleReminderNotification', (event, reminder: { itemID: bigint; date: string; title: string; time?: string; unixMilliseconds?: number}) => {
-      const unixMillisecondsTime = Number(reminder.unixMilliseconds);
-      // Derive datetime from unix epoch milliseconds timestamp
-      // const dateTime = new Date(unixMillisecondsTime);
-
-      // Time until the notification should go off. Computes how many milliseconds there are from now until the reminder epoch time
-      // Current time since epoch in ms - time since epoch for reminder in ms
-      const delay = unixMillisecondsTime - Date.now();
-      console.log('Delay between now and reminder time:', delay);
-
-      // Do not schedule reminder notification in the past
-      if (delay <= 0) {
-        console.error('Reminder time is in the past. Cannot schedule notification.');
-        return false;
-      }
-
-      // Workaround with setTimeout
-      // Schedule the reminder notification after the delay time
-      setTimeout(() => {
-          new Notification({
-          title: 'Reminder',
-          body: `${reminder.title} is scheduled for ${reminder.time} on ${reminder.date}`,
-        }).show();
-      }, delay);
-
-      // Issue with node-schedule and scheduleJob not working in packaged app - needs further investigation
-      /*
-      schedule.scheduleJob(dateTime, () => {
-        new Notification({
-          title: 'Reminder',
-          body: `${reminder.title} is scheduled for ${reminder.time} on ${reminder.date}`,
-        }).show();
-      });
-      */
-
-    return true;
+  ipcMain.handle('validatePassword', (event, password: string) => {
+    return ValidatePassword(password);
   });
 }
-
-ipcMain.handle('createAccount', async (event, username: string, password:string)=> {
-  return await createAccount(username, password);
-});
-
-ipcMain.handle('loginAccount', async (event, username: string, password:string)=> {
-  return await loginAccount(username, password);
-});
-
-ipcMain.handle('clearLocalData', (event) => {
-  clearLocalData();
-});

@@ -1,7 +1,7 @@
 /*
  * Authors: Kevin Sirantoine
  * Created: 2025-10-29
- * Updated: 2025-11-06
+ * Updated: 2025-12-03
  *
  * This file defines functions for converting byte arrays into interface arrays for use in parsing syncdown.ts responses.
  *
@@ -18,10 +18,11 @@ import type {
   WeeklyReminder,
   MonthlyReminder,
   YearlyReminder,
+  Override,
   Deleted
 } from "app/src-electron/types/shared-types";
-import {decrypt} from "app/src-electron/services/crypto";
-import {getPrivateKey1} from "app/src-electron/services/auth";
+import { decrypt } from "app/src-electron/services/crypto";
+import { getPrivateKey1 } from "app/src-electron/services/auth";
 
 export function unpackLastUp(data: Buffer) {
   return {
@@ -238,10 +239,47 @@ export function unpackExtensions(repeatedData: Buffer, recordCount: number) {
       itemID: itemID,
       lastModified: lastModified,
       sequenceNum: sequenceNum,
-      data: getStringFromBuf(decrData, 64)
+      data: decrData.toString('binary', 0, 64)
     };
   }
   return extensions;
+}
+
+export function unpackOverrides(repeatedData: Buffer, recordCount: number) {
+  const overrides: Override[] = new Array(recordCount);
+  let bufPos = 0;
+
+  for (let i = 0; i < recordCount; i++) {
+    const itemID = repeatedData.readBigInt64LE(bufPos);
+    bufPos += 8;
+    const lastModified = repeatedData.readBigInt64LE(bufPos);
+    bufPos += 8;
+    const linkedItemID = repeatedData.readBigInt64LE(bufPos);
+    bufPos += 8;
+    const decrData = decrypt(repeatedData.subarray(bufPos, bufPos + 64), getPrivateKey1(), getPrivateKey1());
+    bufPos += 64;
+
+    let decrBufPos = 0;
+    overrides[i] = {
+      itemID: itemID,
+      lastModified: lastModified,
+      linkedItemID: linkedItemID,
+      origEventStartYear: decrData.readInt32LE(decrBufPos),
+      origEventStartDay: decrData.readInt16LE(decrBufPos += 4),
+      origEventStartMin: decrData.readInt16LE(decrBufPos += 2),
+      eventStartYear: decrData.readInt32LE(decrBufPos += 2),
+      eventStartDay: decrData.readInt16LE(decrBufPos += 4),
+      eventStartMin: decrData.readInt16LE(decrBufPos += 2),
+      eventEndYear: decrData.readInt32LE(decrBufPos += 2),
+      eventEndDay: decrData.readInt16LE(decrBufPos += 4),
+      eventEndMin: decrData.readInt16LE(decrBufPos += 2),
+      notifYear: decrData.readInt32LE(decrBufPos += 2),
+      notifDay: decrData.readInt16LE(decrBufPos += 4),
+      notifMin: decrData.readInt16LE(decrBufPos += 2),
+      hasNotif: decrData[decrBufPos += 2]!
+    };
+  }
+  return overrides;
 }
 
 export function unpackFolders(repeatedData: Buffer, recordCount: number) {

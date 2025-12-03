@@ -1,22 +1,21 @@
 /*
  * Authors: Kevin Sirantoine
  * Created: 2025-10-30
- * Updated: 2025-11-03
+ * Updated: 2025-12-02
  *
  * This file contains a function that manages the full sync operation including syncdown, syncup, lastUpdated, and
  * insertion of retrieved items into the local database.
- *
  *
  * This file is a part of OpenOrganizer.
  * This file and all source code within it are governed by the copyright and license terms outlined in the LICENSE file located in the top-level directory of this distribution.
  * No part of OpenOrganizer, including this file, may be reproduced, modified, distributed, or otherwise used except in accordance with the terms specified in the LICENSE file.
  */
 import * as db from "../db/sqlite-db";
-import {syncdown} from "app/src-electron/services/syncdown";
-import {syncUp} from "app/src-electron/services/syncup";
-import {getDateNowBuffer} from "../utils/sync-utils";
-import {lastUpdated} from "app/src-electron/services/store";
-import type { RetrievedItems} from "app/src-electron/services/syncdown";
+import { syncdown } from "app/src-electron/services/syncdown";
+import { syncUp } from "app/src-electron/services/syncup";
+import { getDateNowBuffer } from "../utils/sync-utils";
+import { lastUpdated, serverAddress } from "app/src-electron/services/store";
+import type { RetrievedItems } from "app/src-electron/services/syncdown";
 import type {
   Note,
   Extension,
@@ -26,14 +25,16 @@ import type {
   WeeklyReminder,
   MonthlyReminder,
   YearlyReminder,
+  Override,
   Deleted
 } from "app/src-electron/types/shared-types";
 
 export async function sync() {
-  const dateNowBuffer = getDateNowBuffer(); // ensures no data is missed in next syncdown if 2 devices sync concurrently
-  const retrievedItems = await syncdown();
-  await syncUp();
+  const serverAddr = serverAddress.get('serverAddress');
+  const retrievedItems = await syncdown(serverAddr);
+  await syncUp(serverAddr);
 
+  const dateNowBuffer = getDateNowBuffer();
   lastUpdated.set('lastUpNotes', dateNowBuffer);
   lastUpdated.set('lastUpReminders', dateNowBuffer);
   lastUpdated.set('lastUpDaily', dateNowBuffer);
@@ -41,6 +42,7 @@ export async function sync() {
   lastUpdated.set('lastUpMonthly', dateNowBuffer);
   lastUpdated.set('lastUpYearly', dateNowBuffer);
   lastUpdated.set('lastUpExtensions', dateNowBuffer);
+  lastUpdated.set('lastUpOverrides', dateNowBuffer);
   lastUpdated.set('lastUpFolders', dateNowBuffer);
   lastUpdated.set('lastUpDeleted', dateNowBuffer);
 
@@ -88,6 +90,11 @@ function insertRetrievedItems(retrievedItems: RetrievedItems) {
       insertRetrievedExtension(extension);
     }
   }
+  if (retrievedItems.overrides !== undefined) {
+    for (const override of retrievedItems.overrides) {
+      insertRetrievedOverride(override);
+    }
+  }
   const folderDeletes: Deleted[] = [];
   if (retrievedItems.deletes !== undefined) {
     for (const deleted of retrievedItems.deletes) {
@@ -104,7 +111,7 @@ function insertRetrievedNote(retrievedNote: Note) {
   const localLm = db.readNoteLm(retrievedNote.itemID);
   if (localLm === undefined) db.createNote(retrievedNote);
   else if (localLm < retrievedNote.lastModified) db.updateNote(retrievedNote);
-  // else if localLm >= retrievedNote.lastModified, keep local copy
+  // keep local copy if localLm >= retrievedNote.lastModified
 }
 
 function insertRetrievedReminder(retrievedRem: Reminder) {
@@ -137,19 +144,25 @@ function insertRetrievedYearly(retrievedYearly: YearlyReminder) {
   else if (localLm < retrievedYearly.lastModified) db.updateYearlyReminder(retrievedYearly);
 }
 
-function insertRetrievedExtension(extension: Extension) {
-  const localLm = db.readExtensionLm(extension.itemID, extension.sequenceNum);
-  if (localLm === undefined) db.createExtension(extension);
-  else if (localLm < extension.lastModified) {
-    db.deleteExtension(extension.itemID, extension.sequenceNum);
-    db.createExtension(extension);
+function insertRetrievedExtension(retrievedExtension: Extension) {
+  const localLm = db.readExtensionLm(retrievedExtension.itemID, retrievedExtension.sequenceNum);
+  if (localLm === undefined) db.createExtension(retrievedExtension);
+  else if (localLm < retrievedExtension.lastModified) {
+    db.deleteExtension(retrievedExtension.itemID, retrievedExtension.sequenceNum);
+    db.createExtension(retrievedExtension);
   }
 }
 
-function insertRetrievedFolder(folder: Folder) {
-  const localLm = db.readFolderLm(folder.folderID);
-  if (localLm === undefined) db.createFolder(folder);
-  else if (localLm < folder.lastModified) db.updateFolder(folder);
+function insertRetrievedOverride(retrievedOverride: Override) {
+  const localLm = db.readOverrideLm(retrievedOverride.itemID);
+  if (localLm === undefined) db.createOrUpdateOverride(retrievedOverride);
+  else if (localLm < retrievedOverride.lastModified) db.createOrUpdateOverride(retrievedOverride);
+}
+
+function insertRetrievedFolder(retrievedFolder: Folder) {
+  const localLm = db.readFolderLm(retrievedFolder.folderID);
+  if (localLm === undefined) db.createFolder(retrievedFolder);
+  else if (localLm < retrievedFolder.lastModified) db.updateFolder(retrievedFolder);
 }
 
 const notesTable = 11;
@@ -158,7 +171,6 @@ const dailyTable = 21;
 const weeklyTable = 22;
 const monthlyTable = 23;
 const yearlyTable = 24;
-const overridesTable = 31;
 const foldersTable = 32;
 
 function insertRetrievedDeleted(deleted: Deleted) {
@@ -203,7 +215,14 @@ function attemptDeleteItem(itemID: bigint, itemTable: number) {
       break;
   }
 
-  if (deleteOccurred) db.deleteAllExtensions(itemID); // delete all extensions associated with deleted item
+  if (deleteOccurred) {
+    db.deleteAllExtensions(itemID); // delete all extensions associated with deleted item
+
+    if (Math.floor(itemTable / 10) === 2) { // itemTable = 2_ (recurring reminder)
+      db.deleteGeneratedRemindersById(itemID);
+      db.deleteOverridesByLinkedId(itemID);
+    }
+  }
 }
 
 function attemptDeleteFolder(folderID: bigint) {

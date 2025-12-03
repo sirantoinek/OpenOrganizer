@@ -1,10 +1,9 @@
 /*
  * Authors: Kevin Sirantoine
  * Created: 2025-10-30
- * Updated: 2025-10-30
+ * Updated: 2025-12-02
  *
  * This file defines helper functions used by both syncup.ts and syncdown.ts.
- *
  *
  * This file is a part of OpenOrganizer.
  * This file and all source code within it are governed by the copyright and license terms outlined in the LICENSE file located in the top-level directory of this distribution.
@@ -20,16 +19,14 @@ export async function sendRequest(url: string, body: Buffer) {
     });
   }
   catch (error) {
-    console.error('syncup/notes error: ', error);
+    console.error('sync error\n\n');
   }
 }
 
 export function logResponse(url: string, response: Axios.AxiosXHR<unknown>): void {
-  console.log('URL: ', url)
+  console.log('URL: ', url);
   console.log('Status: ', response.status);
   console.log('Status Text: ', response.statusText);
-  // console.log('Headers: ', response.headers);
-  // console.log('Data: ', response.data);
 }
 
 export function getDateNowBuffer() {
